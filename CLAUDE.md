@@ -163,7 +163,31 @@ NixOS firewall defaults to iptables backend (unless `networking.nftables.enable 
 ## Key Conventions
 
 - **Module priority**: `lib.mkDefault` for common defaults, `lib.mkForce` for host overrides
-- **Unstable packages**: `pkgs.unstable.<package>` (overlay in flake.nix)
+- **Unstable packages**: `pkgs.unstable.<package>` (overlay in flake.nix).
+  ⚠️ **ONLY FOR STANDALONE BINARIES.** It works for `ollama-rocm` and `sunshine`
+  because those are programs; it does **not** transfer to a module that builds
+  its own language environment, where the package and the interpreter must come
+  from the same nixpkgs.
+
+  Measured 2026-08-31: `services.searx.package = pkgs.unstable.searxng` took the
+  service **completely down** — HTTP 500 on every route including the root page.
+  The module builds uwsgi's interpreter from the stable `python3` (3.13) and the
+  unstable package is built against 3.14, so `searx` landed in a site-packages
+  tree the vassal's PythonHome never sees; the env contained 0 entries matching
+  it. Journal: `ModuleNotFoundError: No module named 'searx'` then `no app
+  loaded. going in full dynamic mode` — and **uwsgi stayed `active` throughout**,
+  serving 500s while systemd called it healthy.
+
+  Wanting a newer version of a module's package means moving the whole module to
+  unstable, not swapping one package underneath a stable one. **The precedent is
+  not the mechanism: check that the analogy holds before copying it.**
+
+  Pre-deploy check that would have caught it, and now the standard one for any
+  package override on a Python/Node module — read the built closure, not the
+  exit code:
+
+      # the module's interpreter env must actually contain the module
+      ls <pyhome>/lib/python*/site-packages/ | grep -c '^searx$'
 - **Desktop**: MangoWM Wayland compositor + Noctalia shell
 - **Theme**: Catppuccin Macchiato system-wide
 - **Browser**: Zen Browser
