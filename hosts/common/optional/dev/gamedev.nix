@@ -8,7 +8,7 @@
 #
 # Workstation only, on purpose. Home Manager's user-packages.nix applies to the
 # workstation AND the laptop, and the laptop is a thin client for game dev — it
-# SSHes to the workstation rather than rendering locally (see the game-design
+# SSHes to the workstation rather than rendering locally (see the ephemeris-forge
 # docs). Putting Blender there would cost ~1 GB on a machine that never runs it.
 #
 # Blender is a hard dependency of the forge toolchain, not a convenience: seven
