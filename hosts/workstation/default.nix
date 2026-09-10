@@ -89,6 +89,54 @@
   system.stateVersion = "25.05";
 
   ################################
+  ## ZFS snapshots — retention capped for a pool near capacity
+  ################################
+  # ⚠️ THIS HOST WAS SNAPSHOTTING NOTHING, AND EVERY TIMER SAID OTHERWISE.
+  # Found 2026-09-10 while attempting to recover a file deleted an hour earlier.
+  # All five zfs-snapshot units were enabled, armed, and had just run with
+  # status=0/SUCCESS; the recovery failed because the newest snapshot on the
+  # machine was pre-26.05-migration-20260821-1218, three weeks old. Cause:
+  # zfs-auto-snapshot acts only on datasets with com.sun:auto-snapshot=true, and
+  # 0 of 30 datasets carried it. The run log said "IO: 0B read, 0B written"
+  # directly under "Finished ZFS auto-snapshotting every 15 mins".
+  #
+  # Fixed out of band, because a dataset property is pool metadata and not a nix
+  # option:  zfs set com.sun:auto-snapshot=true rpool/home   (children inherit)
+  # ⚠️ NOTHING CHECKS THAT, AND THAT IS THE UNFIXED HALF. The property lives in
+  # pool metadata, so a host can import this module, pass every check, run every
+  # timer green and protect nothing — which is exactly what happened here for
+  # three weeks. What is missing is a probe asserting a RECENT SNAPSHOT EXISTS,
+  # per dataset, rather than asserting that a unit is happy. Not built: the
+  # monitoring section above records observability as deliberately parked, and
+  # both parked sentinels alert to ntfy on the server, so this one would need
+  # somewhere else to report. Declared absent rather than omitted.
+  #
+  # Retention is capped at 7 days here, against the shared default of 12 months.
+  # Measured on rpool at the time of the decision:
+  #   pool          928G, 92% full, 71.2G free
+  #   /home         737G referenced, 282G written in 20 days (~14G/day)
+  #   pinned by one 20-day-old snapshot   6.73G  (~0.34G/day of long-lived
+  #                                              deletions -> ~10G/month)
+  # A 12-month tail projects to ~120G of pinned deletions against 71.2G free, so
+  # the default would fill this pool before its first monthly rolled off. And
+  # 0.34G/day is a FLOOR: measured under a single 20-day-old snapshot, nothing
+  # created-and-deleted in between was ever pinned. At a 15-minute cadence the
+  # caches, nix builds and Electron test runs that make up most of the 14G/day
+  # start counting. Seven days bounds that; a year does not.
+  #
+  # 0 means NONE CREATED, not "unlimited" — verified in zfstools 0.3.6 rather
+  # than assumed: bin/zfs-auto-snapshot line 68 is
+  #   do_new_snapshots(datasets, interval) if keep > 0
+  # and line 71 then cleans up existing snapshots of that interval down to the
+  # keep count. The weekly and monthly TIMERS still exist and still run green;
+  # they now do nothing on purpose, which is the same shape as the defect above
+  # and is why the intent is written here rather than left to be inferred.
+  services.zfs.autoSnapshot = {
+    weekly = 0;
+    monthly = 0;
+  };
+
+  ################################
   ## Kernel
   ################################
   # 6.18 LTS (supported upstream to Dec 2028) — the newest kernel that both EXISTS in
