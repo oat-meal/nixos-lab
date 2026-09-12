@@ -280,7 +280,26 @@ in
       windowrule=isfloating:1,appid:pavucontrol
       windowrule=isfloating:1,appid:nm-connection-editor
       windowrule=isfloating:1,appid:blueman-manager
-      windowrule=isfloating:1,title:Picture-in-Picture
+      # Browser Picture-in-Picture, parked in the upper-left corner so it can
+      # overlay a fullscreen game without landing on the middle of the screen.
+      # offsetx/offsety are PERCENTAGES FROM SCREEN CENTRE, not pixels, and
+      # -100/+100 is the edge including the outer gap -- so -100,-100 is flush
+      # upper-left. Measured 2026-09-11 on DP-1 (3072x1728 logical, gappo 8): a
+      # probe window with this rule landed at x=8, y=42, i.e. exactly the outer
+      # gap on the left and clear of the Noctalia bar on top.
+      # no_force_center is deliberately NOT set: the offsets are applied
+      # relative to centre and took effect on their own, so it is not needed.
+      # Anchored for the same reason the Aurora rule below is -- matching is
+      # PCRE, and a bare title:Picture-in-Picture is an unanchored regex that
+      # would also float and corner-park an ordinary browsing window whose page
+      # title merely contains the phrase. Zen's PiP titles the window exactly
+      # "Picture-in-Picture" (verified via mmsg). Left appid-agnostic on
+      # purpose: Firefox and its forks all use this title, and the appid does
+      # not (zen-beta here).
+      # Size is left to the client. This build DOES honour width/height in a
+      # windowrule -- verified on the same probe, which came up 800x450 -- so
+      # add them here if the default PiP size ever wants pinning.
+      windowrule=isfloating:1,title:^Picture-in-Picture$,offsetx:-100,offsety:-100
       # Aurora, launched into a game's Proton prefix via PROTON_REMOTE_DEBUG_CMD.
       # Tiled, the scroller layout forces its Xwayland window to the tile
       # geometry (2721x1678) after it maps, and its input and its rendering then
