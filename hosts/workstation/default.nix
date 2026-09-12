@@ -48,6 +48,7 @@
 
     # Power
     ../common/optional/power/performance.nix
+    ../common/optional/power/memory-pressure.nix  # oomd enrollment + coredump cap (2026-09-11 desktop stall)
 
     # Security
     ../common/optional/security/sudo.nix
