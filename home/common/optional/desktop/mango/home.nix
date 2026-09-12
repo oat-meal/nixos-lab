@@ -164,6 +164,31 @@ in
       bind=SUPER+SHIFT,Up,exchange_client,up
       bind=SUPER+SHIFT,Right,exchange_client,right
 
+      # ---------------- Floating windows: mouse drag / resize ----------------
+      # mango ships these in its own /etc/mango/config.conf, but extraConfig
+      # writes a COMPLETE replacement config rather than an overlay, so every
+      # default it does not restate is simply absent. Measured 2026-09-11: a Zen
+      # Picture-in-Picture window matched the float rule below (mmsg reported
+      # is_floating:true at 701,410 1670x941) and still could not be moved,
+      # because no mousebind existed in the session at all. A floating window is
+      # not a movable window; the binding is what makes it one.
+      # Upstream's comment: btn_left and btn_right cannot bind the none modifier.
+      mousebind=SUPER,btn_left,moveresize,curmove
+      mousebind=SUPER,btn_right,moveresize,curresize
+
+      # Keyboard equivalents, in 50px steps. These are the path that still works
+      # when a fullscreen game holds a pointer grab and SUPER+drag never reaches
+      # the compositor — the case this was added for (PiP over Valheim).
+      # CTRL+SHIFT / CTRL+ALT are free here; SUPER+SHIFT+arrows is exchange_client.
+      bind=CTRL+SHIFT,Left,movewin,-50,+0
+      bind=CTRL+SHIFT,Right,movewin,+50,+0
+      bind=CTRL+SHIFT,Up,movewin,+0,-50
+      bind=CTRL+SHIFT,Down,movewin,+0,+50
+      bind=CTRL+ALT,Left,resizewin,-50,+0
+      bind=CTRL+ALT,Right,resizewin,+50,+0
+      bind=CTRL+ALT,Up,resizewin,+0,-50
+      bind=CTRL+ALT,Down,resizewin,+0,+50
+
       # ---------------- Tags (workspaces) ----------------
       bind=SUPER,1,view,1,0
       bind=SUPER,2,view,2,0
@@ -256,6 +281,25 @@ in
       windowrule=isfloating:1,appid:nm-connection-editor
       windowrule=isfloating:1,appid:blueman-manager
       windowrule=isfloating:1,title:Picture-in-Picture
+      # Aurora, launched into a game's Proton prefix via PROTON_REMOTE_DEBUG_CMD.
+      # Tiled, the scroller layout forces its Xwayland window to the tile
+      # geometry (2721x1678) after it maps, and its input and its rendering then
+      # disagree: fields had to be clicked ABOVE where they were drawn, and
+      # fullscreen ran off the top of the screen. Floating it fixes both.
+      # The forced resize is the trigger, not the window's position — floating
+      # moved it from y=42 to y=119 and the offset went away rather than
+      # growing, which rules out a fixed positional offset. Consistent with wine
+      # keeping the coordinate space of the size it asked for while the
+      # compositor resizes the surface underneath it; a virtual desktop does NOT
+      # help, because the tiling override applies to that window too (asked for
+      # 1600x900, got 2721x1678). Measured 2026-09-11 against Valheim (892970).
+      # Anchored: rule matching is PCRE (mango links pcre2_match_8), so a bare
+      # title:Aurora is an unanchored regex that also catches unrelated windows
+      # with "Aurora" anywhere in the title, e.g. a terminal's session name.
+      # Title-scoped rather than appid-scoped on purpose: the appid is
+      # steam_app_<gameid> and differs per game, but the window is always
+      # "Aurora", so this holds for whatever game it is attached to.
+      windowrule=isfloating:1,title:^Aurora$
     '';
   };
 }
