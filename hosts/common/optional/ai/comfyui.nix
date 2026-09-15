@@ -21,7 +21,6 @@
     ports = [ "10.100.0.2:8188:8188" ]; # wg0 only
     volumes = [ "/storage/comfyui:/opt/ComfyUI" ]; # models, output, custom nodes persist here
     environment = {
-      HSA_OVERRIDE_GFX_VERSION = "11.0.0"; # gfx1100 mapping (gfx1151 ROCm, as with Ollama)
     };
     extraOptions = [
       "--device=/dev/kfd"
