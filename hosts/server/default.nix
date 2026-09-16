@@ -47,6 +47,7 @@ in
     ../common/optional/ai/comfyui.nix
     ../common/optional/ai/dashboard.nix
     ../common/optional/ai/kokoro.nix
+    ../common/optional/ai/hy-motion.nix          # text-to-motion; CPU-only, no vendor exists for this
     ../common/optional/ai/ntfy.nix
   ];
 
