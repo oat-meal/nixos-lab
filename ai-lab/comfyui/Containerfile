@@ -11,7 +11,7 @@
 # Build out-of-band with rootful podman so the (root) oci-containers service can see
 # the resulting image:
 #
-#   cd /etc/nixos/ai-lab/comfyui && sudo podman build -t localhost/comfyui-gfx1151-impact:v0.2-3 .
+#   cd /etc/nixos/ai-lab/comfyui && sudo podman build -t localhost/comfyui-gfx1151-impact:v0.2-4 .
 #
 # Then deploy the server and `sudo systemctl restart podman-comfyui`. Bump the tag
 # (…-2, …-3) when changing deps so the service picks up the new image.
@@ -55,3 +55,38 @@ RUN python3 -m pip install --break-system-packages --no-cache-dir \
 RUN python3 -m pip install --break-system-packages --no-cache-dir \
       insightface \
       onnx
+
+# EchoMimicV3 (ComfyUI_EchoMimic) — audio-driven talking avatar. Portrait plus a
+# voice clip to a video of that portrait speaking. Apache-2.0 code AND weights,
+# 1.3B params on Wan2.1-Fun; the v3-flash path does 768x768 in ~12 GB at 8 steps.
+#
+# ⚠️ mediapipe IS BACK, AND THE COMMENT ABOVE SAYING IT IS "INTENTIONALLY OMITTED"
+# WAS A CACHED VERDICT THAT WENT STALE. It said mediapipe "can force a numpy<2
+# downgrade that breaks torch", which was true when it was written. Checked
+# 2026-09-16: mediapipe 1.0.1 declares a bare `numpy` with no upper bound, so the
+# conflict no longer exists. The floor is pinned here precisely so pip cannot
+# resolve backwards into a version that still carries the old constraint --
+# verify numpy is still 2.x after the build, because that is the thing this pin
+# is protecting and a pin is not a measurement.
+#
+# ⚠️ AND IT IS NEEDED EVEN THOUGH v3 DOES NOT USE IT. echomimic_v3/ contains no
+# mediapipe import at all; the node's __init__ eagerly imports EchoMimic_node ->
+# utils.py -> src/utils/mp_utils.py, which does. So the dependency is a property
+# of how the node is assembled rather than of the model being run, and dropping
+# it would fail at load with an ImportError naming a file the v3 path never
+# executes.
+#
+# Deliberately NOT installed, and each would break something that works:
+#   opencv-python  — opencv-python-headless is already above; both would fight
+#   tensorflow / retina-face / decord / mmgp — the STANDALONE repo needs these;
+#     this node does not, and tensorflow is hard-pinned to 2.15.0 upstream
+RUN python3 -m pip install --break-system-packages --no-cache-dir \
+      "mediapipe>=1.0" \
+      moviepy \
+      ffmpeg-python \
+      av \
+      omegaconf \
+      lpips \
+      torchmetrics \
+      torchtyping \
+      IPython

@@ -14,10 +14,17 @@
 
   virtualisation.oci-containers.containers.comfyui = {
     # Locally-derived image: upstream ignatberesnev/comfyui-gfx1151:v0.2 + the
-    # detailer/upscaler custom-node Python deps baked into its venv. Built out-of-band
+    # detailer/upscaler custom-node Python deps baked into its venv, and as of
+    # v0.2-4 the EchoMimicV3 talking-avatar node's deps too. Built out-of-band
     # (rootful podman) — see ai-lab/comfyui/Containerfile for the build command. The
     # localhost/ prefix keeps podman from trying to pull it from a registry.
-    image = "localhost/comfyui-gfx1151-impact:v0.2-3";
+    #
+    # ⚠️ THE TAG MUST BE BUMPED WHEN THE Containerfile CHANGES, and this is the
+    # only thing that makes the service pick a rebuild up: oci-containers recreates
+    # the container from the image on every restart, so anything pip-installed into
+    # a running one is discarded. A Containerfile edit with the tag left alone
+    # rebuilds an image nothing refers to.
+    image = "localhost/comfyui-gfx1151-impact:v0.2-4";
     ports = [ "10.100.0.2:8188:8188" ]; # wg0 only
     volumes = [ "/storage/comfyui:/opt/ComfyUI" ]; # models, output, custom nodes persist here
     environment = {
