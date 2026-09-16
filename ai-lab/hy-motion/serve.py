@@ -244,8 +244,16 @@ def generate(req: GenerateRequest):
             except Exception as e:  # noqa: BLE001
                 raise HTTPException(status_code=503, detail=f"runtime unavailable: {e}")
             t0 = time.time()
-            # `json` is our rendering of the npz, so ask upstream for the npz.
-            upstream_format = "npz" if req.output_format == "json" else req.output_format
+            # ⚠️ UPSTREAM'S output_format NAMES WHAT IT EXPORTS, NOT WHAT IT
+            # WRITES, AND ASKING IT FOR "npz" IS AN ERROR. It accepts exactly
+            # "fbx" and "dict"; the .npz and .txt are written unconditionally by
+            # save_visualization_data before either branch is reached. So both
+            # `npz` and `json` -- which need only that file -- ask for "dict",
+            # which skips building a 16.8 MB FBX nobody requested. Passing the
+            # caller's word straight through produced
+            # "ValueError: Invalid output format: npz" after a full 59s
+            # generation, because the refusal happens at export, not at entry.
+            upstream_format = "fbx" if req.output_format == "fbx" else "dict"
             try:
                 runtime.generate_motion(
                     text=req.text,
