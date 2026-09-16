@@ -33,6 +33,28 @@
       { command = "/run/current-system/sw/bin/ip6tables"; options = [ "NOPASSWD" ]; }
       { command = "/run/current-system/sw/bin/nft"; options = [ "NOPASSWD" ]; }
       { command = "/run/current-system/sw/bin/ss"; options = [ "NOPASSWD" ]; }
+
+      # Container images. Added 2026-09-16 (oat-approved) after deploying a single
+      # ComfyUI custom node cost FIVE build cycles. The image the service runs is
+      # built out-of-band with rootful podman, and its venv is not readable from
+      # the host — so "is this python module present" could only be answered by
+      # building an image, switching the system, restarting the container and
+      # reading one ModuleNotFoundError out of the journal. Four separate names
+      # were discovered that way, one per round, each round needing a human.
+      #
+      # ⚠️ THIS IS STRONGER THAN THE NETWORK RULES ABOVE AND THE COMMENT THERE
+      # SHOULD NOT BE REUSED FOR IT. That one says "widens diagnostic reach, not
+      # privilege", which is true of reading a ruleset. It is NOT true here:
+      # `podman run --privileged -v /:/host` as root is unrestricted root, and
+      # sudoers cannot constrain podman by argument any more than it can iptables.
+      #
+      # It is granted anyway on the same ground the whole list rests on:
+      # `nixos-rebuild` and `nix*` are already root-equivalent by construction —
+      # anyone who can build and switch a system closure can already do anything.
+      # So this adds no privilege that was not already here. What it adds is the
+      # ability to answer a question in seconds instead of asking a person to run
+      # a four-minute build to find out.
+      { command = "/run/current-system/sw/bin/podman"; options = [ "NOPASSWD" ]; }
     ];
   }];
 }

@@ -24,7 +24,7 @@
     # the container from the image on every restart, so anything pip-installed into
     # a running one is discarded. A Containerfile edit with the tag left alone
     # rebuilds an image nothing refers to.
-    image = "localhost/comfyui-gfx1151-impact:v0.2-6";
+    image = "localhost/comfyui-gfx1151-impact:v0.2-5";
     ports = [ "10.100.0.2:8188:8188" ]; # wg0 only
     volumes = [ "/storage/comfyui:/opt/ComfyUI" ]; # models, output, custom nodes persist here
     environment = {
