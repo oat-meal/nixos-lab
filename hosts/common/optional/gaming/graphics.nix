@@ -22,6 +22,30 @@
     extraPackages32 = with pkgs.pkgsi686Linux; [
       libva-vdpau-driver
       libvdpau-va-gl
+
+      # 32-bit text/compositing libraries for wine.
+      #
+      # The Steam FHS (and therefore steam-run, which is how Proton is invoked
+      # outside Steam) builds its 32-bit library set from this list -- see
+      # programs.steam.package's `extraLibraries`, which appends
+      # hardware.graphics.extraPackages32 for the non-64-bit case. Without
+      # these, /usr/lib32 inside that FHS held 856 entries against 2792 in
+      # /usr/lib, and all three below were absent.
+      #
+      # Measured 2026-09-12 with the 32-bit Battle.net client:
+      #   freetype    - wine logs "Wine cannot find the FreeType font library"
+      #                 ~29x per launch and renders NO glyphs at all, which
+      #                 looks like a blank window rather than a font fault
+      #   fontconfig  - font discovery/matching
+      #   libXrender  - winex11.drv uses XRender for surface blits and alpha
+      #                 compositing; without it repaints leave stale white
+      #                 regions that only refresh under the pointer
+      #
+      # NB: programs.steam.extraPackages is NOT the right option for this --
+      # it feeds targetPkgs and is 64-bit only.
+      freetype
+      fontconfig
+      libXrender
     ];
   };
 
