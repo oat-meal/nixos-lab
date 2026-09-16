@@ -37,10 +37,13 @@ NODE=${1:-/storage/comfyui/custom_nodes/ComfyUI_EchoMimic}
 U="$NODE/utils.py"
 [ -r "$U" ] || { echo "patch: no utils.py at $U" >&2; exit 2; }
 
+# ⚠️ SKIP, DO NOT EXIT. This guard used to `exit 0`, so once section 1 had been
+# applied the script returned success without ever reaching section 2 -- a fix
+# added later was silently never run, and the script reported "already applied"
+# as though it had done everything. Each section decides for itself now.
 if grep -q "EPHEMERIS-FORGE LAZY MEDIAPIPE" "$U"; then
-  echo "patch: already applied to $U"
-  exit 0
-fi
+  echo "patch: utils.py already patched"
+else
 cp -n "$U" "$U.orig"
 
 python3 - "$U" <<'PY'
@@ -99,3 +102,51 @@ print(f"patch: applied to {p}")
 PY
 
 python3 -c "import ast,sys; ast.parse(open(sys.argv[1], encoding='utf8').read()); print('patch: utils.py still parses')" "$U"
+fi
+
+# ── 2. the flash transformer imports a `dist` module that does not exist ──────
+#
+# ⚠️ THIS IS NOT A MISSING DEPENDENCY, AND THE ERROR READS LIKE ONE.
+# `ModuleNotFoundError: No module named '<abs path>.echomimic_v3.src.dist'` --
+# a module name with a filesystem path inside it, which looks like a broken venv
+# and is not. echomimic_v3/src/ has no `dist` package at all.
+#
+# It is sequence-parallel / xFuser multi-GPU inference code, and upstream ALREADY
+# commented these four lines out in the sibling file wan_transformer3d_audio.py
+# (lines 25-28) while leaving them live in the _2512 flash variant. So this
+# mirrors a decision upstream made rather than inventing one.
+#
+# The names ARE referenced later, in enable_multi_gpus_inference paths -- which is
+# exactly why the sibling file gets away with it: single-GPU inference never
+# reaches them, and a NameError there is the honest outcome for a multi-GPU call
+# on a one-GPU box. Better a clear failure at the multi-GPU entry point than the
+# whole node refusing to load for everybody.
+T="$NODE/echomimic_v3/src/wan_transformer3d_audio_2512.py"
+if [ -r "$T" ] && ! grep -q "EPHEMERIS-FORGE NO XFUSER" "$T"; then
+  cp -n "$T" "$T.orig"
+  python3 - "$T" <<'PY'
+import re, sys
+p = sys.argv[1]
+s = open(p, encoding="utf8").read()
+block = """from .dist import (get_sequence_parallel_rank,
+                    get_sequence_parallel_world_size, get_sp_group,
+                    xFuserLongContextAttention)
+from .dist.wan_xfuser import usp_attn_forward"""
+if block not in s:
+    raise SystemExit("patch: the xfuser import block is not as expected, refusing to guess")
+commented = "\n".join("# " + ln for ln in block.splitlines())
+s = s.replace(block,
+    "# --- EPHEMERIS-FORGE NO XFUSER ---------------------------------------------\n"
+    "# src/dist does not exist in this node. Upstream commented the identical block\n"
+    "# out of wan_transformer3d_audio.py and left it live here. Single-GPU inference\n"
+    "# never reaches the names below; a multi-GPU call would NameError, which is the\n"
+    "# honest failure on a one-GPU box.\n"
+    + commented +
+    "\n# --- end EPHEMERIS-FORGE NO XFUSER -----------------------------------------", 1)
+open(p, "w", encoding="utf8").write(s)
+print(f"patch: applied to {p}")
+PY
+  python3 -c "import ast,sys; ast.parse(open(sys.argv[1], encoding='utf8').read()); print('patch: flash transformer still parses')" "$T"
+else
+  echo "patch: flash transformer already patched or absent"
+fi

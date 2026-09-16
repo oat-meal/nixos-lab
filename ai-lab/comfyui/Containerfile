@@ -11,7 +11,7 @@
 # Build out-of-band with rootful podman so the (root) oci-containers service can see
 # the resulting image:
 #
-#   cd /etc/nixos/ai-lab/comfyui && sudo podman build -t localhost/comfyui-gfx1151-impact:v0.2-5 .
+#   cd /etc/nixos/ai-lab/comfyui && sudo podman build -t localhost/comfyui-gfx1151-impact:v0.2-6 .
 #
 # Then deploy the server and `sudo systemctl restart podman-comfyui`. Bump the tag
 # (…-2, …-3) when changing deps so the service picks up the new image.
@@ -76,7 +76,7 @@ RUN python3 -m pip install --break-system-packages --no-cache-dir \
 # satisfies both. The original comment was right the whole time, and checking half
 # a constraint is how you end up contradicting it with confidence.
 #
-# The resolution is patch-echomimic-mediapipe.sh, which makes the node's three
+# The resolution is patch-echomimic.sh, which makes the node's three
 # mediapipe-bearing imports lazy. They serve the v1 and v2 paths; echomimic_v3/
 # contains no mediapipe import at all, so v3 loads and v1/v2 fail with a stated
 # reason IF USED. Run that script after installing or updating the node --
@@ -108,6 +108,11 @@ RUN python3 -m pip install --break-system-packages --no-cache-dir \
       diffusers \
       accelerate \
       librosa \
+      decord \
+      loguru \
+      more_itertools \
+      pyloudnorm \
+      imageio-ffmpeg \
       moviepy \
       ffmpeg-python \
       av \
@@ -116,3 +121,28 @@ RUN python3 -m pip install --break-system-packages --no-cache-dir \
       torchmetrics \
       torchtyping \
       IPython
+
+# ⚠️ FAIL AT BUILD TIME, NOT FOUR MINUTES LATER IN A JOURNAL. Every missing name
+# above was discovered one per cycle: build the image, rebuild the system, restart
+# the container, read the log, find ONE more ModuleNotFoundError. Four rounds of
+# that (mediapipe, diffusers, src/dist, decord) before this line existed.
+#
+# This imports the third-party modules the node's eager chain touches, so a gap
+# stops the build with the name in the output instead of shipping an image that
+# cannot load the node. It is not a substitute for running the thing -- it proves
+# the modules import, not that the node works -- but it moves the cheapest class
+# of failure to the cheapest place to find it.
+#
+# decord is the interesting one: last released 2021, and its only linux artefact is
+# `decord-0.6.0-py3-none-manylinux2010_x86_64.whl` -- a universal py3 wheel, so it
+# installs on 3.12 despite predating it. A check for cpXX tags says it is
+# unavailable, which is what I concluded before looking at the filenames.
+RUN python3 -c "import importlib, sys; \
+    mods = ['torch','torchvision','torchaudio','transformers','diffusers','accelerate', \
+            'librosa','decord','loguru','more_itertools','pyloudnorm','imageio', \
+            'imageio_ffmpeg','moviepy','ffmpeg','av','omegaconf','lpips','torchmetrics', \
+            'torchtyping','IPython','cv2','numpy','PIL','safetensors','huggingface_hub', \
+            'einops','skimage','onnxruntime','requests','regex','matplotlib','tqdm']; \
+    bad = [m for m in mods if not importlib.util.find_spec(m)]; \
+    print(f'import check: {len(mods)-len(bad)}/{len(mods)} present'); \
+    sys.exit('MISSING: ' + ', '.join(bad) if bad else 0)"
