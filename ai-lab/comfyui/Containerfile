@@ -126,6 +126,23 @@ RUN python3 -m pip install --break-system-packages --no-cache-dir \
       torchtyping \
       IPython
 
+# LatentSync (ComfyUI-LatentSyncWrapper) — the OTHER half of the avatar capability:
+# re-dubbing an EXISTING video with new audio, where EchoMimicV3 animates a still
+# portrait. ByteDance, Apache-2.0 for code and weights, 512x512.
+#
+# mediapipe is above; decord, soundfile, diffusers, omegaconf, einops, opencv,
+# ffmpeg-python, safetensors, huggingface_hub and transformers are all already in
+# the image. face-alignment and DeepCache are what remain, and both were checked
+# in a disposable container first: installing them leaves numpy at 2.4.1 and torch
+# at 2.9.1+rocm7.2.
+RUN python3 -m pip install --break-system-packages --no-cache-dir \
+      face-alignment \
+      DeepCache
+
+# ⚠️ THE CHECK GOES LAST, AND I APPENDED AN INSTALL AFTER IT ONCE. That put the
+# gate at STEP 7 and the new packages at STEP 8, so it verified a state the
+# finished image would not have and failed on names installed one step later.
+# Anything added below this line is unverified by it.
 # ⚠️ FAIL AT BUILD TIME, NOT FOUR MINUTES LATER IN A JOURNAL. Every missing name
 # above was discovered one per cycle: build the image, rebuild the system, restart
 # the container, read the log, find ONE more ModuleNotFoundError. Four rounds of
@@ -157,16 +174,3 @@ RUN python3 -c "import importlib.util, sys; \
     bad = [m for m in mods if not importlib.util.find_spec(m)]; \
     print(f'import check: {len(mods)-len(bad)}/{len(mods)} present'); \
     sys.exit('MISSING: ' + ', '.join(bad) if bad else 0)"
-
-# LatentSync (ComfyUI-LatentSyncWrapper) — the OTHER half of the avatar capability:
-# re-dubbing an EXISTING video with new audio, where EchoMimicV3 animates a still
-# portrait. ByteDance, Apache-2.0 for code and weights, 512x512.
-#
-# mediapipe is above; decord, soundfile, diffusers, omegaconf, einops, opencv,
-# ffmpeg-python, safetensors, huggingface_hub and transformers are all already in
-# the image. face-alignment and DeepCache are what remain, and both were checked
-# in a disposable container first: installing them leaves numpy at 2.4.1 and torch
-# at 2.9.1+rocm7.2.
-RUN python3 -m pip install --break-system-packages --no-cache-dir \
-      face-alignment \
-      DeepCache
