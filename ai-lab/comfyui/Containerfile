@@ -11,7 +11,7 @@
 # Build out-of-band with rootful podman so the (root) oci-containers service can see
 # the resulting image:
 #
-#   cd /etc/nixos/ai-lab/comfyui && sudo podman build -t localhost/comfyui-gfx1151-impact:v0.2-6 .
+#   cd /etc/nixos/ai-lab/comfyui && sudo podman build -t localhost/comfyui-gfx1151-impact:v0.2-7 .
 #
 # Then deploy the server and `sudo systemctl restart podman-comfyui`. Bump the tag
 # (…-2, …-3) when changing deps so the service picks up the new image.
@@ -60,27 +60,32 @@ RUN python3 -m pip install --break-system-packages --no-cache-dir \
 # voice clip to a video of that portrait speaking. Apache-2.0 code AND weights,
 # 1.3B params on Wan2.1-Fun; the v3-flash path does 768x768 in ~12 GB at 8 steps.
 #
-# ⚠️ mediapipe IS STILL OMITTED, AND I ADDED IT ONCE BEFORE READING THE WHOLE
-# CONSTRAINT. The comment above says mediapipe "can force a numpy<2 downgrade that
-# breaks torch". The node needs mediapipe, so v0.2-4 pinned `mediapipe>=1.0` on the
-# grounds that 1.0.1 declares a bare `numpy` and that the warning had gone stale.
-# Half of that was true and the conclusion was the opposite of correct:
+# ⚠️ mediapipe IS HERE NOW, AND I GOT THIS WRONG TWICE BEFORE TESTING IT ONCE.
+# The comment above says mediapipe "can force a numpy<2 downgrade that breaks
+# torch". Three attempts at that constraint:
 #
-#   - the node imports `from mediapipe import solutions`, the LEGACY API
-#   - `solutions` exists only in 0.10.x
-#   - every 0.10.x release (checked 0.10.18 / 0.10.20 / 0.10.21) declares numpy<2
-#   - 1.0 dropped the numpy bound AND dropped `solutions`
+#   1. v0.2-4 pinned `mediapipe>=1.0`, reasoning the warning had gone stale
+#      because 1.0.1 declares a bare `numpy`. 1.0 also REMOVED the legacy
+#      `solutions` API the nodes import, so ComfyUI logged
+#      `ImportError: cannot import name 'solutions' from 'mediapipe'`.
+#   2. I then concluded "no version satisfies both", because every 0.10.x release
+#      declares numpy<2 and only 0.10.x has `solutions`. Both facts true; the
+#      conclusion wrong.
+#   3. MEASURED, finally: mediapipe 0.10.21 installed with --no-deps imports
+#      `solutions` and runs face detection on a real array against numpy 2.4.1,
+#      with torch untouched.
 #
-# So the floor pin bought numpy 2.x and cost the API the node imports, and ComfyUI
-# logged `ImportError: cannot import name 'solutions' from 'mediapipe'`. No version
-# satisfies both. The original comment was right the whole time, and checking half
-# a constraint is how you end up contradicting it with confidence.
+# `numpy<2` is a CONSERVATIVE DECLARATION, not a runtime requirement. --no-deps is
+# what stops pip acting on the declaration; the package itself does not care. Both
+# earlier conclusions came from reading version metadata, and the thing that
+# settled it was running the code -- which cost one disposable container.
 #
-# The resolution is patch-echomimic.sh, which makes the node's three
-# mediapipe-bearing imports lazy. They serve the v1 and v2 paths; echomimic_v3/
-# contains no mediapipe import at all, so v3 loads and v1/v2 fail with a stated
-# reason IF USED. Run that script after installing or updating the node --
-# custom_nodes lives on the data volume and is not in this repository.
+# ⚠️ SO patch-echomimic.sh's FIRST SECTION IS NOW A NO-OP, AND IS KEPT ANYWAY. Its
+# try/except simply succeeds. It stays because it is the honest fallback on an
+# image without mediapipe, and because deleting the record would erase the reason
+# the rest of this comment exists. Its other two sections are still load-bearing.
+RUN python3 -m pip install --break-system-packages --no-cache-dir --no-deps \
+      mediapipe==0.10.21
 #
 # ⚠️ diffusers IS NOT IN THE BASE VENV, which is easy to assume it would be.
 # ComfyUI implements its own pipelines and does not depend on it; this node does.
@@ -91,7 +96,6 @@ RUN python3 -m pip install --break-system-packages --no-cache-dir \
 # assumptions about it.
 #
 # Deliberately NOT installed, and each would break something that works:
-#   mediapipe      — see above; no version satisfies both the node and torch
 #   opencv-python  — opencv-python-headless is already above; both would fight
 #   tensorflow / retina-face / decord / mmgp — the STANDALONE repo needs these;
 #     this node does not, and tensorflow is hard-pinned to 2.15.0 upstream
@@ -148,7 +152,21 @@ RUN python3 -c "import importlib.util, sys; \
             'librosa','decord','loguru','more_itertools','pyloudnorm','imageio', \
             'imageio_ffmpeg','moviepy','ffmpeg','av','omegaconf','lpips','torchmetrics', \
             'torchtyping','IPython','cv2','numpy','PIL','safetensors','huggingface_hub', \
-            'einops','skimage','onnxruntime','requests','regex','matplotlib','tqdm']; \
+            'einops','skimage','onnxruntime','requests','regex','matplotlib','tqdm', \
+            'mediapipe','face_alignment','DeepCache']; \
     bad = [m for m in mods if not importlib.util.find_spec(m)]; \
     print(f'import check: {len(mods)-len(bad)}/{len(mods)} present'); \
     sys.exit('MISSING: ' + ', '.join(bad) if bad else 0)"
+
+# LatentSync (ComfyUI-LatentSyncWrapper) — the OTHER half of the avatar capability:
+# re-dubbing an EXISTING video with new audio, where EchoMimicV3 animates a still
+# portrait. ByteDance, Apache-2.0 for code and weights, 512x512.
+#
+# mediapipe is above; decord, soundfile, diffusers, omegaconf, einops, opencv,
+# ffmpeg-python, safetensors, huggingface_hub and transformers are all already in
+# the image. face-alignment and DeepCache are what remain, and both were checked
+# in a disposable container first: installing them leaves numpy at 2.4.1 and torch
+# at 2.9.1+rocm7.2.
+RUN python3 -m pip install --break-system-packages --no-cache-dir \
+      face-alignment \
+      DeepCache
