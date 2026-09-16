@@ -74,15 +74,21 @@ in
       # First start resolves library packages through nix and imports torch.
       TimeoutStartSec = "10min";
 
-      # ⚠️ 139 IS A SUCCESSFUL STOP HERE, AND SAYING SO IS THE POINT. This model
-      # segfaults at PYTHON INTERPRETER TEARDOWN, every time, after all work is
-      # done — measured by a script that printed "REACHED END OF MAIN" and then
-      # exited 139 with both its outputs correct on disk. It is the reason this
-      # is a service rather than a command: a long-running process never reaches
-      # teardown, so the crash never happens in normal operation. It DOES happen
-      # on `systemctl stop`, and without this line every clean stop would be
-      # recorded as a failure and Restart=on-failure would bring it back up.
-      SuccessExitStatus = [ "139" "SIGSEGV" ];
+      # ⚠️ THERE IS DELIBERATELY NO `SuccessExitStatus = 139` HERE, AND THE FIRST
+      # VERSION OF THIS UNIT HAD ONE. The reasoning was that this model segfaults
+      # at python interpreter teardown — which it does, every time, when run as a
+      # command: a script that printed "REACHED END OF MAIN" then exited 139 with
+      # its outputs correct on disk. That is the whole reason this is a service
+      # rather than a command.
+      #
+      # But the guard was written from that reasoning rather than from a
+      # measurement of THIS path, and the measurement refutes it. A stop with the
+      # model loaded gives ExecMainCode=2 ExecMainStatus=15 Result=success:
+      # uvicorn handles SIGTERM and the process never reaches the teardown that
+      # crashes. So the allowance was never exercised, and it is not free — it
+      # would make a GENUINE segfault during load read as a clean exit and stop
+      # Restart=on-failure from ever firing. An unexercised allowance that
+      # silences the failure it was never needed for is strictly worse than none.
     };
   };
 
