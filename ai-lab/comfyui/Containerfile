@@ -11,7 +11,7 @@
 # Build out-of-band with rootful podman so the (root) oci-containers service can see
 # the resulting image:
 #
-#   cd /etc/nixos/ai-lab/comfyui && sudo podman build -t localhost/comfyui-gfx1151-impact:v0.2-4 .
+#   cd /etc/nixos/ai-lab/comfyui && sudo podman build -t localhost/comfyui-gfx1151-impact:v0.2-5 .
 #
 # Then deploy the server and `sudo systemctl restart podman-comfyui`. Bump the tag
 # (…-2, …-3) when changing deps so the service picks up the new image.
@@ -60,28 +60,54 @@ RUN python3 -m pip install --break-system-packages --no-cache-dir \
 # voice clip to a video of that portrait speaking. Apache-2.0 code AND weights,
 # 1.3B params on Wan2.1-Fun; the v3-flash path does 768x768 in ~12 GB at 8 steps.
 #
-# ⚠️ mediapipe IS BACK, AND THE COMMENT ABOVE SAYING IT IS "INTENTIONALLY OMITTED"
-# WAS A CACHED VERDICT THAT WENT STALE. It said mediapipe "can force a numpy<2
-# downgrade that breaks torch", which was true when it was written. Checked
-# 2026-09-16: mediapipe 1.0.1 declares a bare `numpy` with no upper bound, so the
-# conflict no longer exists. The floor is pinned here precisely so pip cannot
-# resolve backwards into a version that still carries the old constraint --
-# verify numpy is still 2.x after the build, because that is the thing this pin
-# is protecting and a pin is not a measurement.
+# ⚠️ mediapipe IS STILL OMITTED, AND I ADDED IT ONCE BEFORE READING THE WHOLE
+# CONSTRAINT. The comment above says mediapipe "can force a numpy<2 downgrade that
+# breaks torch". The node needs mediapipe, so v0.2-4 pinned `mediapipe>=1.0` on the
+# grounds that 1.0.1 declares a bare `numpy` and that the warning had gone stale.
+# Half of that was true and the conclusion was the opposite of correct:
 #
-# ⚠️ AND IT IS NEEDED EVEN THOUGH v3 DOES NOT USE IT. echomimic_v3/ contains no
-# mediapipe import at all; the node's __init__ eagerly imports EchoMimic_node ->
-# utils.py -> src/utils/mp_utils.py, which does. So the dependency is a property
-# of how the node is assembled rather than of the model being run, and dropping
-# it would fail at load with an ImportError naming a file the v3 path never
-# executes.
+#   - the node imports `from mediapipe import solutions`, the LEGACY API
+#   - `solutions` exists only in 0.10.x
+#   - every 0.10.x release (checked 0.10.18 / 0.10.20 / 0.10.21) declares numpy<2
+#   - 1.0 dropped the numpy bound AND dropped `solutions`
+#
+# So the floor pin bought numpy 2.x and cost the API the node imports, and ComfyUI
+# logged `ImportError: cannot import name 'solutions' from 'mediapipe'`. No version
+# satisfies both. The original comment was right the whole time, and checking half
+# a constraint is how you end up contradicting it with confidence.
+#
+# The resolution is patch-echomimic-mediapipe.sh, which makes the node's three
+# mediapipe-bearing imports lazy. They serve the v1 and v2 paths; echomimic_v3/
+# contains no mediapipe import at all, so v3 loads and v1/v2 fail with a stated
+# reason IF USED. Run that script after installing or updating the node --
+# custom_nodes lives on the data volume and is not in this repository.
+#
+# ⚠️ diffusers IS NOT IN THE BASE VENV, which is easy to assume it would be.
+# ComfyUI implements its own pipelines and does not depend on it; this node does.
+# v0.2-4 shipped without it and failed at origin_infer.py line 4 with
+# `No module named 'diffusers'` — the SECOND import error in a row, each one
+# visible only after a full image build and a restart. Both were avoidable by
+# reading the node's requirements.txt against the venv rather than against my
+# assumptions about it.
 #
 # Deliberately NOT installed, and each would break something that works:
+#   mediapipe      — see above; no version satisfies both the node and torch
 #   opencv-python  — opencv-python-headless is already above; both would fight
 #   tensorflow / retina-face / decord / mmgp — the STANDALONE repo needs these;
 #     this node does not, and tensorflow is hard-pinned to 2.15.0 upstream
+# This list was derived by walking the node's EAGER import chain rather than by
+# copying its requirements.txt: __init__ -> EchoMimic_node -> {utils, origin_infer,
+# echomimic_v3/infer, echomimic_v3/infer_flash_pro} and the v3 src tree. Two builds
+# were spent discovering one missing name at a time, which is the expensive way.
+#
+# retinaface is NOT here on purpose, and its absence was checked rather than
+# assumed: echomimic_v3/src/face_detect.py imports it at top level, and nothing in
+# the tree imports face_detect. It is dead code in this node, so the tensorflow
+# 2.15.0 pin behind it never loads.
 RUN python3 -m pip install --break-system-packages --no-cache-dir \
-      "mediapipe>=1.0" \
+      diffusers \
+      accelerate \
+      librosa \
       moviepy \
       ffmpeg-python \
       av \
