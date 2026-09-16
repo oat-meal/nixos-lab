@@ -150,3 +150,49 @@ PY
 else
   echo "patch: flash transformer already patched or absent"
 fi
+
+# ── 3. torchaudio.save() now routes through torchcodec, which will not load ────
+#
+# ⚠️ NOT A MISSING PACKAGE THAT CAN SIMPLY BE INSTALLED. torchaudio 2.9 dropped its
+# own encoders and forwards save() to torchcodec, so the node dies at
+# `ImportError: TorchCodec is required for save_with_torchcodec` before the sampler
+# ever runs. Installing torchcodec does not fix it: tested against this image, the
+# wheel installs and then fails at import with
+# `OSError: Could not load this library: .../libtorchcodec_image.so` -- its binary
+# is built for CUDA torch and this is torch 2.9.1+rocm7.2.
+#
+# soundfile 0.14.0 is already in the venv (via librosa), writes WAV without any
+# torch involvement, and is what the downstream reader expects anyway.
+#
+# ⚠️ AND IT FIXES A LATENT BUG IN THE NODE WHILE IT IS HERE: the original wrote
+# FLAC-encoded bytes into a file named `.wav`. That works only because the reader
+# sniffs content rather than trusting the extension -- a file whose name lies about
+# its contents, waiting for the first consumer that believes the name.
+N_NODE="$NODE/EchoMimic_node.py"
+if [ -r "$N_NODE" ] && ! grep -q "EPHEMERIS-FORGE SOUNDFILE" "$N_NODE"; then
+  cp -n "$N_NODE" "$N_NODE.orig"
+  python3 - "$N_NODE" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p, encoding="utf8").read()
+old = '        torchaudio.save(buff, audio["waveform"].squeeze(0), audio["sample_rate"], format="FLAC")'
+if old not in s:
+    raise SystemExit("patch: the torchaudio.save line is not as expected, refusing to guess")
+new = '''        # --- EPHEMERIS-FORGE SOUNDFILE ---------------------------------------
+        # torchaudio 2.9 forwards save() to torchcodec, whose binary will not load
+        # against ROCm torch. soundfile is already present and needs no torch.
+        # Also writes WAV rather than FLAC-named-.wav, which is what the filename
+        # has always claimed.
+        import soundfile as _sf
+        _wave = audio["waveform"].squeeze(0).detach().cpu().numpy()
+        if _wave.ndim == 2:
+            _wave = _wave.T          # soundfile wants (samples, channels)
+        _sf.write(buff, _wave, int(audio["sample_rate"]), format="WAV", subtype="PCM_16")
+        # --- end EPHEMERIS-FORGE SOUNDFILE -----------------------------------'''
+open(p, "w", encoding="utf8").write(s.replace(old, new, 1))
+print(f"patch: applied to {p}")
+PY
+  python3 -c "import ast,sys; ast.parse(open(sys.argv[1], encoding='utf8').read()); print('patch: EchoMimic_node.py still parses')" "$N_NODE"
+else
+  echo "patch: EchoMimic_node.py already patched or absent"
+fi
