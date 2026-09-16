@@ -37,6 +37,7 @@ This binds on the wireguard address by default, exactly as ComfyUI does, and has
 no authentication -- the private network is the boundary. Do not publish it.
 """
 
+import json
 import os
 import os.path as osp
 import threading
@@ -128,7 +129,8 @@ class GenerateRequest(BaseModel):
     duration: float = Field(default=4.0, gt=0.4, le=20.0)
     seed: int = Field(default=42, ge=0)
     cfg_scale: float = Field(default=5.0, gt=0.0, le=20.0)
-    output_format: str = Field(default="fbx", pattern="^(fbx|npz)$")
+    # `json` is ours, not upstream's. See _write_json below.
+    output_format: str = Field(default="fbx", pattern="^(fbx|npz|json)$")
 
 
 @app.get("/health")
@@ -145,6 +147,83 @@ def health():
         "waiting": _waiting,
         "error": _runtime_error,
     }
+
+
+_SKELETON_DIR = osp.join(ROOT, "scripts/gradio/static/assets/dump_wooden")
+_skeleton = None
+
+
+def _load_skeleton():
+    """The joint hierarchy, read from the model rather than transcribed.
+
+    ⚠️ NAMES AND PARENTS COME OFF DISK FOR A REASON. This is the standard SMPL-H
+    tree -- 22 body joints then 30 finger joints -- and it would be easy to type
+    from memory. A hierarchy that is one entry out produces motion that plays,
+    looks almost right, and is wrong in a way no structural check can see.
+    """
+    global _skeleton
+    if _skeleton is None:
+        import numpy as np
+
+        parents = np.frombuffer(
+            open(osp.join(_SKELETON_DIR, "kintree.bin"), "rb").read(), dtype=np.int32)
+        with open(osp.join(_SKELETON_DIR, "joint_names.json")) as f:
+            names = json.load(f)
+        if len(names) != len(parents):
+            raise RuntimeError(f"{len(names)} joint names for {len(parents)} parents")
+        _skeleton = (names, [int(p) for p in parents])
+    return _skeleton
+
+
+def _write_json(stem: str, req: "GenerateRequest") -> str:
+    """Render the produced .npz as portable JSON, and return the filename.
+
+    ⚠️ THIS EXISTS BECAUSE .npz IS A NUMPY CONTAINER AND THE CALLER IS NOT
+    PYTHON. It is a ZIP of .npy members; consuming it from JavaScript means
+    implementing two container formats to read six arrays. Converting here is
+    the smaller, more honest contract: the caller asks for motion and receives
+    motion, in the one format every language already reads.
+
+    ⚠️ ROTATIONS ARE EMITTED AS AXIS-ANGLE, EXACTLY AS THE MODEL PRODUCES THEM.
+    Converting to quaternions here would bake a handedness and an order choice
+    into the transport, where it cannot be seen or argued with. The consumer
+    converts, and states which convention it used.
+    """
+    import numpy as np
+
+    src = osp.join(OUT_DIR, f"{stem}_000.npz")
+    if not osp.exists(src):
+        raise RuntimeError(f"no npz to convert at {src}")
+    z = np.load(src, allow_pickle=True)
+    poses, trans = z["poses"], z["trans"]
+    names, parents = _load_skeleton()
+    frames, width = poses.shape
+    if width != len(names) * 3:
+        raise RuntimeError(f"poses width {width} is not 3 * {len(names)} joints")
+
+    doc = {
+        "format": "hy-motion/axis-angle",
+        "skeleton": "SMPL-H",
+        "jointNames": names,
+        "parents": parents,
+        "jointCount": len(names),
+        "frameCount": int(frames),
+        # ⚠️ DERIVED, NOT ASSUMED. A hard-coded 30 would stay 30 after any change
+        # upstream makes to sampling, and every consumer would resample wrongly
+        # against a number that used to be true.
+        "fps": round(frames / req.duration, 6),
+        "durationSeconds": req.duration,
+        "seed": req.seed,
+        "cfgScale": req.cfg_scale,
+        "text": req.text,
+        "rotations": poses.reshape(frames, len(names), 3).astype(float).tolist(),
+        "rootTranslation": trans.astype(float).tolist(),
+        "betas": z["betas"].astype(float).tolist() if "betas" in z else None,
+    }
+    name = f"{stem}_000.json"
+    with open(osp.join(OUT_DIR, name), "w") as f:
+        json.dump(doc, f)
+    return name
 
 
 @app.post("/generate")
@@ -165,16 +244,20 @@ def generate(req: GenerateRequest):
             except Exception as e:  # noqa: BLE001
                 raise HTTPException(status_code=503, detail=f"runtime unavailable: {e}")
             t0 = time.time()
+            # `json` is our rendering of the npz, so ask upstream for the npz.
+            upstream_format = "npz" if req.output_format == "json" else req.output_format
             try:
                 runtime.generate_motion(
                     text=req.text,
                     seeds_csv=str(req.seed),
                     duration=req.duration,
                     cfg_scale=req.cfg_scale,
-                    output_format=req.output_format,
+                    output_format=upstream_format,
                     output_dir=OUT_DIR,
                     output_filename=stem,
                 )
+                if req.output_format == "json":
+                    _write_json(stem, req)
             except HTTPException:
                 raise
             except Exception as e:  # noqa: BLE001
