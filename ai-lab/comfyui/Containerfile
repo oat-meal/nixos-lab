@@ -11,7 +11,7 @@
 # Build out-of-band with rootful podman so the (root) oci-containers service can see
 # the resulting image:
 #
-#   cd /etc/nixos/ai-lab/comfyui && sudo podman build -t localhost/comfyui-gfx1151-impact:v0.2-7 .
+#   cd /etc/nixos/ai-lab/comfyui && sudo podman build -t localhost/comfyui-gfx1151-impact:v0.2-8 .
 #
 # Then deploy the server and `sudo systemctl restart podman-comfyui`. Bump the tag
 # (…-2, …-3) when changing deps so the service picks up the new image.
@@ -139,6 +139,31 @@ RUN python3 -m pip install --break-system-packages --no-cache-dir \
       face-alignment \
       DeepCache
 
+# ⚠️ AN ffmpeg BINARY ON PATH -- A PYTHON PACKAGE NAMED ffmpeg IS NOT ONE.
+# LatentSyncNode's first act is `subprocess.run(["ffmpeg", "-version"])`
+# (nodes.py:211) and it raises `FFmpeg is required but not found` when that
+# fails. The image had `ffmpeg-python` and `imageio-ffmpeg` installed and no
+# `ffmpeg` on PATH, which is exactly the shape that reads as satisfied in a
+# requirements list and is not: those two are a wrapper and a wheel that carries
+# a binary under a private name. EchoMimicV3 printed the same warning for days
+# and did not care, because it never shells out -- so the gap was visible and
+# harmless until a second node needed it.
+#
+# Symlinked rather than `apt-get install ffmpeg`, and the reason is pinning: the
+# wheel already fixes a version (7.0.2, a static build) and the Ubuntu archive
+# floats. Measured in a disposable container before choosing -- the preprocess
+# chain encodes with `-c:v libx264` and extracts audio through `-q:a 0`, and this
+# build reports libx264, aac and libmp3lame all present. It also costs no layer
+# size, where the apt route pulls in some 300 MB.
+#
+# ⚠️ ffprobe IS DELIBERATELY ABSENT AND THE WHEEL DOES NOT SHIP ONE. Checked
+# rather than assumed: 0 references to `ffprobe` and 0 to `.probe(` across the
+# node tree, and every one of its ~14 invocations is `ffmpeg`. If something here
+# ever calls `ffmpeg.probe()` it will fail with FileNotFoundError and THIS is
+# the comment to come back to -- the fix is then apt, not another symlink.
+RUN ln -s "$(python3 -c 'import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())')" \
+      /usr/local/bin/ffmpeg && ffmpeg -version | head -1
+
 # ⚠️ THE CHECK GOES LAST, AND I APPENDED AN INSTALL AFTER IT ONCE. That put the
 # gate at STEP 7 and the new packages at STEP 8, so it verified a state the
 # finished image would not have and failed on names installed one step later.
@@ -174,3 +199,18 @@ RUN python3 -c "import importlib.util, sys; \
     bad = [m for m in mods if not importlib.util.find_spec(m)]; \
     print(f'import check: {len(mods)-len(bad)}/{len(mods)} present'); \
     sys.exit('MISSING: ' + ', '.join(bad) if bad else 0)"
+
+# The binary half of the same gate, and it RUNS the thing rather than testing for
+# the file: `shutil.which` alone would pass on a dangling symlink, which is
+# precisely what a symlink into a versioned wheel path becomes when the wheel is
+# upgraded. Asking for the encoder list is the consumer path -- the node does not
+# want a file named ffmpeg, it wants one that can write H.264.
+RUN python3 -c "import shutil, subprocess, sys; \
+    p = shutil.which('ffmpeg'); \
+    print(f'ffmpeg on PATH: {p}'); \
+    sys.exit('ffmpeg is not on PATH') if not p else None; \
+    r = subprocess.run([p,'-hide_banner','-encoders'], capture_output=True, text=True); \
+    need = ['libx264','libmp3lame']; \
+    missing = [e for e in need if e not in r.stdout]; \
+    print(f'encoder check: {len(need)-len(missing)}/{len(need)} present'); \
+    sys.exit('MISSING ENCODERS: ' + ', '.join(missing) if missing else 0)"
