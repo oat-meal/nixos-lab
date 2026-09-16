@@ -137,7 +137,13 @@ RUN python3 -m pip install --break-system-packages --no-cache-dir \
 # `decord-0.6.0-py3-none-manylinux2010_x86_64.whl` -- a universal py3 wheel, so it
 # installs on 3.12 despite predating it. A check for cpXX tags says it is
 # unavailable, which is what I concluded before looking at the filenames.
-RUN python3 -c "import importlib, sys; \
+# ⚠️ `import importlib.util`, NOT `import importlib`. The submodule is not pulled
+# in by importing the package, so the first version of this check died with
+# `AttributeError: module 'importlib' has no attribute 'util'` and FAILED THE
+# BUILD -- the gate written to make a missing module cheap to find was itself
+# broken by a missing import, and cost a build cycle of its own. Suspect the probe
+# before the thing it measures.
+RUN python3 -c "import importlib.util, sys; \
     mods = ['torch','torchvision','torchaudio','transformers','diffusers','accelerate', \
             'librosa','decord','loguru','more_itertools','pyloudnorm','imageio', \
             'imageio_ffmpeg','moviepy','ffmpeg','av','omegaconf','lpips','torchmetrics', \
