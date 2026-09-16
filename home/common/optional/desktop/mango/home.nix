@@ -71,6 +71,67 @@ in
 
     # Full config in mango's native format. See https://mangowm.github.io/docs
     extraConfig = ''
+      # ================= KEYBIND CHEATSHEET =================
+      # Derived from the binds below on 2026-09-15. It is a COPY, not the source
+      # of truth -- if you change a bind, change this table in the same edit or
+      # it becomes a confidently-wrong cached verdict. Every line here is
+      # restated verbatim further down the file.
+      #
+      # Mod = SUPER. Layout is `scroller` on all 9 tags, so tiled "resize" means
+      # setting a window's PROPORTION of the screen, not dragging a split.
+      #
+      #   Window size -- tiled (scroller)
+      #     SUPER r                cycle proportion presets
+      #     SUPER minus            set proportion 0.5  (half width)
+      #     SUPER equal            set proportion 1.0  (full width)
+      #
+      #   Window size/pos -- floating
+      #     SUPER + drag LMB       move
+      #     SUPER + drag RMB       resize
+      #     CTRL+SHIFT arrows      move  in 50px steps  (works under a pointer grab)
+      #     CTRL+ALT   arrows      resize in 50px steps (works under a pointer grab)
+      #
+      #   Window state
+      #     SUPER q                close window
+      #     SUPER f                maximize to screen
+      #     SUPER+SHIFT f          true fullscreen
+      #     SUPER space            toggle floating
+      #     SUPER t                layout -> deck
+      #     SUPER+SHIFT space      cycle layouts
+      #     SUPER o                overview
+      #
+      #   Focus / arrangement
+      #     SUPER h j k l          focus left/down/up/right  (arrows also work)
+      #     SUPER+SHIFT h j k l    swap window in that direction (arrows also work)
+      #     SUPER Tab              focus next in stack
+      #
+      #   Tags (workspaces)
+      #     SUPER 1..9             view tag
+      #     SUPER+SHIFT 1..9       send window to tag
+      #     SUPER PgUp / PgDn      prev / next tag
+      #     SUPER+SHIFT PgUp/PgDn  take window to prev / next tag
+      #     SUPER scroll up/down   prev / next tag THAT HAS WINDOWS
+      #
+      #   Launchers
+      #     SUPER d                launcher          SUPER Return   alacritty
+      #     SUPER e                yazi              SUPER b        librewolf
+      #
+      #   Shell / session
+      #     SUPER+SHIFT r          RELOAD THIS CONFIG
+      #     SUPER c                control center    SUPER v        clipboard
+      #     SUPER Escape           lock              SUPER+SHIFT p  session panel
+      #     SUPER+SHIFT c          caffeine toggle   SUPER+SHIFT e  quit mango
+      #
+      #   Capture
+      #     Print                  screenshot fullscreen
+      #     SUPER+SHIFT s          screenshot region
+      #     SUPER+CTRL s           screen record toggle (region; stop w/ same key)
+      #
+      #   Media / hardware keys (no modifier)
+      #     XF86Audio Raise/Lower/Mute, MicMute, Play, Next, Prev
+      #     XF86MonBrightness Up/Down
+      # ======================================================
+
       # ---------------- Displays (HiDPI scaling) ----------------
       # Framework 13 internal panel is 2880x1920 on a 13.5" screen (~250 PPI);
       # at scale 1.0 everything renders tiny. Scale 2.0 → logical 1440x960 — a small
