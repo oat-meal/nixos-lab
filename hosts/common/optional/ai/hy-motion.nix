@@ -38,7 +38,16 @@ in
 
     # `nix` is on PATH because run.sh resolves the shared libraries the ROCm
     # wheels dlopen: the server has no nix-ld, so they are not found otherwise.
-    path = [ pkgs.nix pkgs.bash pkgs.coreutils ];
+    #
+    # ⚠️ nettools IS NOT OPTIONAL, AND ONLY THE REAL UNIT ENVIRONMENT SHOWS IT.
+    # Upstream shells out to `hostname` while loading, just to log which machine
+    # it came up on. Started by hand it works, because a login shell has the
+    # whole system path; started by systemd the PATH is exactly this list, and
+    # the first request died with "No such file or directory: 'hostname'" -- an
+    # error that names a command and not the capability it was serving. A
+    # service verified only the way it was developed is verified on the wrong
+    # environment.
+    path = [ pkgs.nix pkgs.bash pkgs.coreutils pkgs.nettools ];
 
     environment = {
       HY_MOTION_ROOT = root;
