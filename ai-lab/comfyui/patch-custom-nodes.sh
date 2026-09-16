@@ -1,5 +1,16 @@
 #!/usr/bin/env bash
-# Make ComfyUI_EchoMimic loadable without mediapipe, so the v3 path can run.
+# Source patches for the two avatar custom nodes, applied to the data volume.
+#
+#   sections 1-3  ComfyUI_EchoMimic             -- portrait + audio -> video
+#   section 4     ComfyUI-LatentSyncWrapper     -- re-dub an existing video
+#
+# WARNING: RENAMED FROM patch-echomimic.sh 2026-09-16, WHEN IT STOPPED PATCHING
+# ONE NODE. A script called patch-echomimic.sh that silently also edits a second
+# node is the shape this lab keeps paying for -- `verify state, never infer it
+# from a name`, pointed at a filename we chose ourselves. Nothing but a comment
+# in the Containerfile referenced the old name.
+#
+# Sections 1-3: make ComfyUI_EchoMimic loadable without mediapipe, so v3 can run.
 #
 # ⚠️ THE TWO CONSTRAINTS CANNOT BOTH BE MET BY CHOOSING A VERSION, WHICH IS WHY
 # THIS PATCH EXISTS RATHER THAN A PIN.
@@ -195,4 +206,61 @@ PY
   python3 -c "import ast,sys; ast.parse(open(sys.argv[1], encoding='utf8').read()); print('patch: EchoMimic_node.py still parses')" "$N_NODE"
 else
   echo "patch: EchoMimic_node.py already patched or absent"
+fi
+
+# -- 4. LatentSync: the same torchaudio.save defect, in a different shape -------
+#
+# WARNING: THE SECOND NODE HAS THE SAME BUG AND SECTION 3 DOES NOT FIX IT,
+# because a patch keyed to an exact line only ever repairs the line it names.
+# Section 3 matched `torchaudio.save(buff, ..., format="FLAC")` in EchoMimic;
+# this one is `torchaudio.save(audio_path, waveform_cpu, sample_rate)` -- a PATH
+# rather than a buffer, no format argument, different variable names. Same root
+# cause, nothing shared to reuse.
+#
+# The root cause is recorded in full at section 3 and is worth not re-deriving:
+# torchaudio 2.9 dropped its own encoders and forwards save() to torchcodec, and
+# installing torchcodec does NOT fix it -- tested against this image, the wheel
+# installs and then fails at import because its binary is built for CUDA torch
+# while this is torch 2.9.1+rocm7.2.
+#
+# WARNING: AND IT WAS THE SECOND DEFECT HIDING BEHIND THE FIRST. The dub failed
+# at `FFmpeg is required but not found`, that was fixed in the image (v0.2-8),
+# and the very next run failed here instead. Both were always present; the
+# ffmpeg check simply runs first, at the top of the node's entry point, so it
+# masked everything downstream of it. A fix that reveals a new failure has not
+# necessarily failed.
+#
+# Idempotent. Re-run after updating the node: custom_nodes lives on the data
+# volume and is not in this repository.
+LS_NODE=${2:-/storage/comfyui/custom_nodes/ComfyUI-LatentSyncWrapper}
+LS_FILE="$LS_NODE/nodes.py"
+
+if [ ! -r "$LS_FILE" ]; then
+  echo "patch: no nodes.py at $LS_FILE -- skipping section 4"
+elif grep -q "EPHEMERIS-FORGE SOUNDFILE" "$LS_FILE"; then
+  echo "patch: LatentSync nodes.py already patched"
+else
+  python3 - "$LS_FILE" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p, encoding="utf8").read()
+old = "            torchaudio.save(audio_path, waveform_cpu, sample_rate)"
+if old not in s:
+    raise SystemExit("patch: the torchaudio.save line is not as expected, refusing to guess")
+new = "\n".join([
+    "            # --- EPHEMERIS-FORGE SOUNDFILE ---------------------------------",
+    "            # torchaudio 2.9 forwards save() to torchcodec, whose binary will",
+    "            # not load against ROCm torch. soundfile is already present (via",
+    "            # librosa) and writes WAV with no torch involvement at all.",
+    "            import soundfile as _sf",
+    "            _wave = waveform_cpu.detach().cpu().numpy()",
+    "            if _wave.ndim == 2:",
+    "                _wave = _wave.T          # soundfile wants (samples, channels)",
+    "            _sf.write(audio_path, _wave, int(sample_rate), format=\"WAV\", subtype=\"PCM_16\")",
+    "            # --- end EPHEMERIS-FORGE SOUNDFILE -----------------------------",
+])
+open(p, "w", encoding="utf8").write(s.replace(old, new, 1))
+print(f"patch: applied to {p}")
+PY
+  python3 -c "import ast,sys; ast.parse(open(sys.argv[1], encoding='utf8').read()); print('patch: LatentSync nodes.py still parses')" "$LS_FILE"
 fi
