@@ -141,14 +141,28 @@ in
       # Anchored to ^eDP-1$ so it's a no-op on hosts without that output.
       monitorrule=name:^eDP-1$,scale:2.0
 
-      # Workstation LG UltraGear is 3840x2160 on a ~48" panel (~92 PPI); scale 1.25 →
-      # logical 3072x1728. Was 2.0 (logical 1920x1080) until 2026-08-16 — that was
-      # chosen to give the Sunshine 1080p stream a 1:1 capture, but it traded away most
-      # of the desktop's real estate on a panel whose PPI does not need that much
-      # scaling. Streaming now downscales instead; if the softer stream ever becomes the
-      # bigger annoyance, fix it with a Sunshine-specific mode rather than by shaping the
-      # whole desktop around the capture. Anchored to ^DP-1$.
-      monitorrule=name:^DP-1$,scale:1.25
+      # Workstation LG UltraGear is 3840x2160 on a ~48" panel (~92 PPI); scale 1.0 →
+      # logical 3840x2160, i.e. 1:1 with the panel.
+      #
+      # History: 2.0 (logical 1920x1080) until 2026-08-16, chosen to give the Sunshine
+      # 1080p stream a 1:1 capture; then 1.25 (logical 3072x1728) once that proved to
+      # trade away most of the desktop's real estate on a panel whose PPI does not need
+      # that much scaling.
+      #
+      # ⚠️ Dropped to 1.0 on 2026-10-07: FRACTIONAL SCALING HIDES THE NATIVE MODE FROM
+      # FULLSCREEN XWAYLAND CLIENTS. The compositor reports the LOGICAL size, and a game
+      # cannot offer a mode it was never told about. Measured in WoW's own gx.log:
+      #   Monitor 0 "Display1" Size(3072x1728) Pos(0, 0) Refresh Rate(120Hz)
+      # 3840/1.25 = 3072 and 2160/1.25 = 1728 exactly, so 3840x2160 never appeared in
+      # the game's resolution list. It also cost performance rather than saving it — the
+      # client was supersampling 1.4x of 3072x1728 (~4301x2419, MORE pixels than native
+      # 4K) only to be downsampled and then scaled back up by the compositor.
+      # At ~92 PPI, 1.0 is ordinary desktop density (96 DPI reference), not "tiny".
+      #
+      # Streaming still downscales; if the softer stream ever becomes the bigger
+      # annoyance, fix it with a Sunshine-specific mode rather than by shaping the whole
+      # desktop around the capture. Anchored to ^DP-1$.
+      monitorrule=name:^DP-1$,scale:1.0
 
       # ---------------- Appearance ----------------
       gappih=8
@@ -345,9 +359,12 @@ in
       # overlay a fullscreen game without landing on the middle of the screen.
       # offsetx/offsety are PERCENTAGES FROM SCREEN CENTRE, not pixels, and
       # -100/+100 is the edge including the outer gap -- so -100,-100 is flush
-      # upper-left. Measured 2026-09-11 on DP-1 (3072x1728 logical, gappo 8): a
-      # probe window with this rule landed at x=8, y=42, i.e. exactly the outer
-      # gap on the left and clear of the Noctalia bar on top.
+      # upper-left. Measured 2026-09-11 on DP-1 when it was 3072x1728 logical
+      # (gappo 8): a probe window with this rule landed at x=8, y=42, i.e. exactly
+      # the outer gap on the left and clear of the Noctalia bar on top.
+      # ⚠️ DP-1 became 3840x2160 logical on 2026-10-07 (scale 1.25 -> 1.0). The
+      # offsets are PERCENTAGES from centre, so the rule still parks flush
+      # upper-left; the measured x=8,y=42 pair above has NOT been re-derived.
       # no_force_center is deliberately NOT set: the offsets are applied
       # relative to centre and took effect on their own, so it is not needed.
       # Anchored for the same reason the Aurora rule below is -- matching is
