@@ -56,12 +56,20 @@ in
       HY_MOTION_PORT = toString port;
       HY_MOTION_FORCE_CPU = "1";
       HY_MOTION_OUT = "${root}/out-service";
+      HY_MOTION_LDPATH_CACHE = "/var/lib/hy-motion/ldpath";
     };
 
     serviceConfig = {
       Type = "exec";
-      User = "oat"; # owns the checkout, the venv and the weights
-      Group = "users";
+      # Its own user since 2026-10-09; it ran as oat because oat owns the checkout.
+      # It is a network service, so a bug in it was a shell as oat — and oat's ssh
+      # key reached every host. The checkout, venv and weights stay oat-owned and
+      # world-readable; this user writes only out-service/ (tmpfiles below) and its
+      # state directory (the library-path cache, torch's ~/.cache).
+      User = "hy-motion";
+      Group = "hy-motion";
+      StateDirectory = "hy-motion";
+      Environment = [ "HOME=/var/lib/hy-motion" ];
 
       # Upstream resolves some assets relative to the current directory, so the
       # service must start inside the checkout. serve.py also chdir's here, which
@@ -91,6 +99,17 @@ in
       # silences the failure it was never needed for is strictly worse than none.
     };
   };
+
+  users.groups.hy-motion = { };
+  users.users.hy-motion = {
+    isSystemUser = true;
+    group = "hy-motion";
+    extraGroups = [ "users" ]; # so out-service/ can stay group-writable for oat
+  };
+
+  # Output stays where it was, group users, setgid so new files inherit it and oat
+  # can still read and clean them.
+  systemd.tmpfiles.rules = [ "d ${root}/out-service 2775 hy-motion users -" ];
 
   networking.firewall.interfaces."wg0".allowedTCPPorts = [ port ];
 }

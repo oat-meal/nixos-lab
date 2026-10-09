@@ -14,6 +14,13 @@ let
 
   # All hosts except this one
   otherHosts = lib.filterAttrs (name: _: name != hostname) devices;
+
+  # The server only RECEIVES. ~/.claude holds settings.json, whose hooks run shell
+  # commands on every host that starts Claude Code; the server runs network services
+  # and is the most exposed host, so a compromise there must not be able to plant a
+  # hook that the workstation and laptop then execute. Changes made on the server
+  # (its own sessions' memory) stay local and show as "locally changed".
+  folderType = if hostname == "server-nixos" then "receiveonly" else "sendreceive";
 in
 {
   services.syncthing = {
@@ -35,6 +42,7 @@ in
       folders = {
         "claude-context" = {
           path = "/home/${secrets.user}/.claude";
+          type = folderType;
           devices = lib.attrNames otherHosts;
           versioning = {
             type = "simple";
@@ -44,6 +52,7 @@ in
         };
         "git-crypt-keys" = {
           path = "/home/${secrets.user}/.config/git-crypt";
+          type = folderType;
           devices = lib.attrNames otherHosts;
           ignorePerms = false;
         };

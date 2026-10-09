@@ -52,6 +52,7 @@
 
     # Security
     ../common/optional/security/sudo.nix
+    ../common/optional/security/lab-monitor.nix
 
     # Storage
     ../common/optional/storage/zfs-maintenance.nix
@@ -344,4 +345,12 @@
       libpulseaudio libnotify libappindicator-gtk3 libsecret ffmpeg
     ];
   };
+
+  # Units oat may start/stop/restart without sudo (polkit; see security/sudo.nix).
+  lab.restartableUnits = [
+    "podman-comfyui-render.service"
+    "gpu-wedge-sentinel.service"
+    "syncthing.service"
+    "wireguard-wg0.service"
+  ];
 }

@@ -41,16 +41,28 @@ rebuild_remote() {
   # Run git as the login user (oat), NOT root: a root-run pull writes
   # root-owned objects/files into the oat-owned repo, which then breaks
   # subsequent user-run git on that host. Only nixos-rebuild needs sudo.
-  # -n keeps ssh from consuming this script's stdin (the confirm prompts),
-  # so the loop stays correct under both interactive and piped invocation.
+  # -t, not -n: since 2026-10-09 sudo asks for oat's password (security/sudo.nix),
+  # and it needs a terminal to ask on. The confirm prompt for the next host is read
+  # after this ssh returns, so giving ssh the terminal does not eat it. Not usable
+  # piped or unattended — which is the point: a person owns each switch.
   #
-  # Guard: abort if /etc/nixos has any non-oat-owned file (the tell-tale of a
-  # prior `sudo git`), since the upcoming `git pull` would fail mid-deploy.
-  # Surface a clear remediation instead of a cryptic git error.
-  ssh -n "$host" "
+  # Guards, in order:
+  #  - non-oat-owned files in /etc/nixos (the tell-tale of a prior `sudo git`)
+  #    would make the pull fail mid-deploy.
+  #  - uncommitted changes on the REMOTE are silently built into its system, because
+  #    a flake in a dirty git tree evaluates the working tree. Found 2026-10-09: the
+  #    laptop carried an uncommitted hardening.nix edit from 2026-09-03 that would
+  #    have gone live on the next deploy with no commit anywhere describing it.
+  ssh -t "$host" "
     if [ -n \"\$(find /etc/nixos -xdev ! -user oat -print -quit 2>/dev/null)\" ]; then
       echo 'ERROR: /etc/nixos has non-oat-owned files (likely a prior sudo git).'
       echo 'Fix on $host:  sudo chown -R oat:users /etc/nixos'
+      exit 1
+    fi
+    if [ -n \"\$(git -C /etc/nixos status --porcelain)\" ]; then
+      echo 'ERROR: /etc/nixos on $host has uncommitted changes, which would be built in:'
+      git -C /etc/nixos status --short
+      echo 'Commit them (and push from there) or stash them, then deploy again.'
       exit 1
     fi
     git -C /etc/nixos pull --rebase && sudo nixos-rebuild switch --flake /etc/nixos#$host
@@ -149,7 +161,6 @@ for target in "${targets[@]}"; do
         confirm "Rebuild $remote?"
         rebuild_remote "$remote"
       done
-      exit 0
       ;;
     server-nixos|laptop-nixos|workstation-nixos)
       if [ "$target" = "$LOCAL" ]; then

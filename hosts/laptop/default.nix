@@ -45,6 +45,7 @@
 
     # Security
     ../common/optional/security/sudo.nix
+    ../common/optional/security/lab-monitor.nix
 
     # Storage
     ../common/optional/storage/zfs-maintenance.nix
@@ -101,4 +102,10 @@
   ################################
   # For remote playtest: connect to workstation-nixos (10.100.0.1).
   environment.systemPackages = [ pkgs.moonlight-qt ];
+
+  # Units oat may start/stop/restart without sudo (polkit; see security/sudo.nix).
+  lab.restartableUnits = [
+    "syncthing.service"
+    "wireguard-wg0.service"
+  ];
 }

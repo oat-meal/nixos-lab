@@ -400,11 +400,25 @@ in
   ################################
   ## User groups + SSH access
   ################################
-  # Additional passwordless sudo commands (extends shared sudo.nix)
-  security.sudo.extraRules = lib.mkAfter [{
-    users = [ "oat" ];
-    commands = [
-      { command = "/run/current-system/sw/bin/udevadm"; options = [ "NOPASSWD" ]; }
-    ];
-  }];
+  # Units oat may start/stop/restart without sudo (polkit; see security/sudo.nix).
+  lab.restartableUnits = [
+    "adguardhome.service"
+    "chromadb.service"
+    "homepage-dashboard.service"
+    "hy-motion.service"
+    "jellyfin.service"
+    "lab-api.service"
+    "ntfy-sh.service"
+    "ollama.service"
+    "open-webui.service"
+    "podman-comfyui.service"
+    "podman-kokoro.service"
+    "uwsgi.service"
+    "fleet-sentinel.service"
+    "search-sentinel.service"
+    "stack-smoke-test.service"
+    "update-advisor.service"
+    "syncthing.service"
+    "wireguard-wg0.service"
+  ];
 }

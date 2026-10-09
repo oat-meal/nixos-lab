@@ -22,7 +22,7 @@ SELF=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # files sit side by side; imported into the store by the systemd module they get
 # one store path each, so `$SELF/serve.py` does not exist there.
 SERVE=${HY_MOTION_SERVE:-$SELF/serve.py}
-CACHE=$ROOT/.ldpath
+CACHE=${HY_MOTION_LDPATH_CACHE:-$ROOT/.ldpath}
 NIX="nix --extra-experimental-features nix-command --extra-experimental-features flakes"
 
 # Packages that own the shared libraries the ROCm torch wheels dlopen.

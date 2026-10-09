@@ -79,7 +79,7 @@ incompatible with unattended boot.
 
 - **Role**: Headless home server
 - **Remote access**: SSH and Mosh (wg0-only, key-only, no root)
-- **Sudo**: Scoped passwordless (nixos-rebuild, nix, systemctl, git, zfs, zpool, udevadm)
+- **Sudo**: password (60 min global cache); NOPASSWD only for `lab-fw-dump`, `lab-listeners`, `lab-podman-probe` (2026-10-09; the udevadm rule had no consumer and was dropped)
 - **Services**: Ollama (ROCm GPU), Jellyfin, AdGuard Home, NFS server
 - **NFS**: Exports `/storage` to WireGuard subnet (root_squash)
 - **ZFS ARC**: 32GB

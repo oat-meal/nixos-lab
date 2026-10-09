@@ -31,6 +31,9 @@ KNOWN_STATES = os.environ.get("KNOWN_STATES", "/etc/nixos/docs/audit/known-state
 REPORT = os.environ.get("SENTINEL_REPORT", "/var/lib/fleet-sentinel/latest.md")
 NTFY = os.environ.get("NTFY_URL", "")
 DISK_WARN, DISK_CRIT = 85, 95
+# Remote probes log in as lab-monitor (no wheel, journal group only) with a key that
+# is authorized nowhere else, so a compromised server is not oat on the other hosts.
+MONITOR_KEY = os.environ.get("LAB_MONITOR_KEY", os.path.expanduser("~/.ssh/lab_monitor"))
 _ESC = re.compile(r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b\[[0-9;?]*[ -/]*[@-~]")
 
 
@@ -45,7 +48,8 @@ def run_on(ip, shell_cmd: str, timeout: int = 12) -> str:
         argv = ["sh", "-c", full]
     else:
         argv = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5",
-                "-o", "StrictHostKeyChecking=accept-new", f"oat@{ip}", full]
+                "-o", "StrictHostKeyChecking=accept-new",
+                "-o", "IdentitiesOnly=yes", "-i", MONITOR_KEY, f"lab-monitor@{ip}", full]
         timeout += 5
     try:
         r = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)

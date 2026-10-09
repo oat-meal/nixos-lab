@@ -18,7 +18,7 @@
 - **Power**: Always-on, performance governor, all power saving disabled
 - **GameMode**: 12-core pinning (4 reserved for system)
 - **SSH**: wg0-only, key-only, fail2ban (`openFirewall = false`, `ListenAddress = 10.100.0.1`)
-- **Sudo**: Scoped passwordless (nixos-rebuild, nix, systemctl, git, zfs, zpool)
+- **Sudo**: password (60 min global cache); NOPASSWD only for `lab-fw-dump`, `lab-listeners`, `lab-podman-probe` (2026-10-09)
 - **NFS mount**: `/mnt/server` via WireGuard (10.100.0.2)
 - **DisplayLink**: EVDI module for USB displays
 - **nix-ld**: Enabled for Fightcade, AppImages

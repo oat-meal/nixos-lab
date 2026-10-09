@@ -124,7 +124,7 @@ systemctl status wireguard-wg0.service | head -10
 
 ```bash
 # Verify SSH restricted to wg0
-sudo iptables -L nixos-fw -n -v 2>/dev/null | grep -E '22|wg0'
+sudo lab-fw-dump | grep -E '22|wg0'
 
 # Verify LAN SSH blocked (run from another host)
 # nc -z -w 3 <LAN_IP> 22

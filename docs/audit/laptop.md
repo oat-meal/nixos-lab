@@ -18,7 +18,7 @@
 - **Fingerprint**: Reader support enabled
 - **Framework tools**: ectool
 - **SSH**: wg0-only, key-only, fail2ban (`openFirewall = false`, `ListenAddress = 10.100.0.3`)
-- **Sudo**: Scoped passwordless (nixos-rebuild, nix, systemctl, git, zfs, zpool)
+- **Sudo**: password (60 min global cache); NOPASSWD only for `lab-fw-dump`, `lab-listeners`, `lab-podman-probe` (2026-10-09)
 
 ## Differences from Workstation
 

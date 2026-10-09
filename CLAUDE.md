@@ -81,10 +81,28 @@ docs/
 
 ## Deployment
 
+### Privilege (since 2026-10-09 — see `hosts/common/optional/security/sudo.nix`)
+
+**sudo needs oat's password.** It is cached for 60 minutes across every terminal
+(`timestamp_type=global`), so an agent session can sudo only inside a window the
+person opened by typing it. Check with `sudo -n true` — if it fails, ASK; do not
+look for another route to root. The old NOPASSWD list (nixos-rebuild, nix*,
+systemctl, git, podman, zfs, zpool, iptables/nft, ss, udevadm) is gone.
+
+Needs no sudo at all: `journalctl` (systemd-journal group), `systemctl status/show`,
+`zpool status`, `zfs list`, `nixos-rebuild build`, `nix build`, and
+`systemctl start|stop|restart <unit>` for the units in the host's
+`lab.restartableUnits` (polkit).
+
+Passwordless, read-only wrappers: `sudo lab-fw-dump` (nft + iptables rulesets),
+`sudo lab-listeners` (`ss -tulpn` with owning processes),
+`sudo lab-podman-probe ps|images|inspect C|logs C|has-py C MODULE`.
+
 ### Local rebuild
 
 ```bash
-sudo nixos-rebuild switch --flake /etc/nixos#$(hostname)
+nixos-rebuild build --flake /etc/nixos#$(hostname)          # no sudo; validates
+sudo nixos-rebuild switch --flake /etc/nixos#$(hostname)    # password (cached 60 min)
 ```
 
 ### Deploy script
@@ -103,8 +121,12 @@ bash /etc/nixos/deploy.sh all
 ### Manual remote rebuild
 
 ```bash
-ssh server-nixos "sudo git -C /etc/nixos -c core.sshCommand='ssh -i /home/<user>/.ssh/id_ed25519 -o IdentitiesOnly=yes' pull --rebase && sudo nixos-rebuild switch --flake /etc/nixos#server-nixos"
+ssh -t server-nixos "git -C /etc/nixos pull --rebase && sudo nixos-rebuild switch --flake /etc/nixos#server-nixos"
 ```
+
+`-t` because sudo asks for the password. Never `sudo git` — it leaves root-owned
+files in `/etc/nixos` that break the next pull (`deploy.sh` refuses to run if it
+finds any).
 
 ## Host Access Map
 
@@ -155,7 +177,7 @@ Flake pure evaluation blocks absolute paths. All imports must be relative. Secre
 Check `rp_filter` — Linux uses `max(all, interface)`. Both `net.ipv4.conf.all.rp_filter` and `net.ipv4.conf.wg0.rp_filter` must be `2` (loose). The wireguard.nix module handles this with `lib.mkForce`.
 
 ### Service not restarting after rebuild
-Some services (WireGuard, Syncthing) need manual restart: `sudo systemctl restart wireguard-wg0.service`
+Some services (WireGuard, Syncthing) need manual restart: `systemctl restart wireguard-wg0.service` (no sudo — it is in every host's `lab.restartableUnits`)
 
 ### Firewall interface patterns
 NixOS firewall defaults to iptables backend (unless `networking.nftables.enable = true`). In iptables, `+` is the wildcard suffix; in nftables, `*` is. The NixOS `interfaces` option passes the key directly to the backend. WireGuard interface `wg0` must be listed explicitly if SSH should be reachable over the mesh.
@@ -193,7 +215,8 @@ NixOS firewall defaults to iptables backend (unless `networking.nftables.enable 
 - **Browser**: Zen Browser
 - **Shell**: Zsh with Oh-My-Zsh
 - **User**: Single user `<user>` with Home Manager
-- **Passwordless sudo**: All hosts have scoped NOPASSWD for nixos-rebuild, nix*, systemctl, git, zfs, zpool
+- **sudo**: password, cached 60 min globally; NOPASSWD only for the read-only `lab-*` wrappers (see Privilege above)
+- **Remote probes**: fleet-sentinel and host-health MCP log in to workstation/laptop as `lab-monitor` (journal group only) with `~/.ssh/lab_monitor` on the server; the server's oat key is not authorized anywhere
 
 ## Documentation Style
 

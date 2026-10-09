@@ -33,8 +33,12 @@ in
   # SSH only over WireGuard mesh
   networking.firewall.interfaces."wg0".allowedTCPPorts = [ 22 ];
 
-  # Authorize all lab host keys
-  users.users.oat.openssh.authorizedKeys.keys = lib.attrValues secrets.sshKeys;
+  # Authorize the hosts a person works FROM. The server's key is deliberately absent:
+  # it is used unattended, so it cannot carry a passphrase, and its probes now log in
+  # as lab-monitor instead (security/lab-monitor.nix). ssh from the server to another
+  # host as oat no longer works, by design.
+  users.users.oat.openssh.authorizedKeys.keys =
+    lib.attrValues (removeAttrs secrets.sshKeys [ "server-nixos" ]);
 
   # Rate-limit SSH brute force
   services.fail2ban = {

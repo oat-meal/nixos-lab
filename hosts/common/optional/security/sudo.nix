@@ -1,60 +1,107 @@
-# Scoped passwordless sudo for system management
-# Hosts can extend with additional commands via lib.mkAfter
+# sudo and polkit policy for oat — three tiers, decided 2026-10-09
+#
+#   1. No privilege at all. journalctl (systemd-journal group), systemctl status/show,
+#      zpool status / zfs list, nixos-rebuild build, nix build. Most "sudo" use was habit.
+#   2. Passwordless, bounded. The lab-* wrappers below take no free-form arguments, and
+#      polkit lets oat start/stop/restart the units a host lists in
+#      lab.restartableUnits — `systemctl restart <unit>` with no sudo at all.
+#   3. Everything else needs the password, cached for 60 minutes across every terminal
+#      (timestamp_type=global). That cache is shared with agents running as oat: after
+#      you type it once, a Claude session can sudo for the rest of the hour.
+#
+# What this replaced: NOPASSWD for nixos-rebuild, nix*, systemctl, git, podman, zfs,
+# zpool, iptables/ip6tables/nft and ss (+ udevadm on the server). That list was called
+# "scoped" and was root by construction — its own comments said so for nixos-rebuild,
+# nix* and podman, and `nix*` also matched nix-shell/nix-env, and `sudo git` reaches a
+# root shell through its pager. Any process running as oat had silent root on all three
+# hosts. nixos-rebuild cannot come back here: /etc/nixos is oat-writable, so "may switch
+# without a password" is "may become root without a password".
+#
+# The wrappers keep the diagnostic reach the old rules were added for (2026-08-16 the
+# container-port investigation needed the live ruleset and listener owners; 2026-09-16
+# the ComfyUI custom-node rounds needed "is module X in the image") without granting
+# rule modification or arbitrary container execution.
 
-{ ... }:
+{ config, lib, pkgs, ... }:
 
+let
+  wrappers = [
+    (pkgs.writeShellApplication {
+      name = "lab-fw-dump";
+      runtimeInputs = [ pkgs.nftables pkgs.iptables ];
+      text = ''
+        echo "### nft list ruleset"; nft list ruleset
+        echo "### iptables-save";    iptables-save
+        echo "### ip6tables-save";   ip6tables-save
+      '';
+    })
+    (pkgs.writeShellApplication {
+      name = "lab-listeners";
+      runtimeInputs = [ pkgs.iproute2 ];
+      text = "ss -tulpnH";
+    })
+    (pkgs.writeShellApplication {
+      name = "lab-podman-probe";
+      runtimeInputs = [ pkgs.podman ];
+      text = ''
+        name='^[A-Za-z0-9_.-]+$'
+        module='^[A-Za-z_][A-Za-z0-9_.]*$'
+        usage() { echo "usage: lab-podman-probe ps | images | inspect C | logs C | has-py C MODULE" >&2; exit 2; }
+        c="''${2:-}"; m="''${3:-}"
+        case "''${1:-}" in
+          ps)      podman ps -a ;;
+          images)  podman image ls ;;
+          inspect) [[ "$c" =~ $name ]] || usage; podman inspect "$c" ;;
+          logs)    [[ "$c" =~ $name ]] || usage; podman logs --tail 200 "$c" ;;
+          has-py)  [[ "$c" =~ $name && "$m" =~ $module ]] || usage
+                   if podman exec "$c" python3 -c \
+                        'import importlib.util, sys; sys.exit(importlib.util.find_spec(sys.argv[1]) is None)' "$m"
+                   then echo "present: $m"
+                   else echo "absent: $m"; exit 1
+                   fi ;;
+          *)       usage ;;
+        esac
+      '';
+    })
+  ];
+in
 {
-  security.sudo.extraRules = [{
-    users = [ "oat" ];
-    commands = [
-      { command = "/run/current-system/sw/bin/nixos-rebuild"; options = [ "NOPASSWD" ]; }
-      { command = "/run/current-system/sw/bin/nix*"; options = [ "NOPASSWD" ]; }
-      { command = "/run/current-system/sw/bin/systemctl"; options = [ "NOPASSWD" ]; }
-      { command = "/run/current-system/sw/bin/git"; options = [ "NOPASSWD" ]; }
-      { command = "/run/current-system/sw/bin/zfs"; options = [ "NOPASSWD" ]; }
-      { command = "/run/current-system/sw/bin/zpool"; options = [ "NOPASSWD" ]; }
+  options.lab.restartableUnits = lib.mkOption {
+    type = lib.types.listOf lib.types.str;
+    default = [ ];
+    description = "Units oat may start, stop or restart via polkit without a password.";
+  };
 
-      # Network diagnosis. Added 2026-08-16 (oat-approved) after container-port
-      # reachability could not be diagnosed without reading the live ruleset: every
-      # NATIVE service on server-nixos answered over wg0 (ollama 11434, adguard 3000,
-      # ntfy 2586, lab-api 8091) while BOTH podman published ports were blocked
-      # (comfyui 8188, kokoro 8880) — and 8188 is present in the evaluated
-      # wg0.allowedTCPPorts, so the declared config looked correct for both.
-      #
-      # This grants rule MODIFICATION, not just inspection: sudoers cannot usefully
-      # constrain iptables by argument, since -L and -A differ by one flag. That is
-      # acceptable here only because `nixos-rebuild` and `nix*` above are already
-      # root-equivalent by construction — anyone who can build and switch a system
-      # closure can do anything. This widens diagnostic reach, not privilege.
-      #
-      # nft is included for when/if the firewall backend moves off iptables;
-      # ss needs root for -p (owning process), which is what identifies a listener.
-      { command = "/run/current-system/sw/bin/iptables"; options = [ "NOPASSWD" ]; }
-      { command = "/run/current-system/sw/bin/ip6tables"; options = [ "NOPASSWD" ]; }
-      { command = "/run/current-system/sw/bin/nft"; options = [ "NOPASSWD" ]; }
-      { command = "/run/current-system/sw/bin/ss"; options = [ "NOPASSWD" ]; }
+  config = {
+    environment.systemPackages = wrappers;
 
-      # Container images. Added 2026-09-16 (oat-approved) after deploying a single
-      # ComfyUI custom node cost FIVE build cycles. The image the service runs is
-      # built out-of-band with rootful podman, and its venv is not readable from
-      # the host — so "is this python module present" could only be answered by
-      # building an image, switching the system, restarting the container and
-      # reading one ModuleNotFoundError out of the journal. Four separate names
-      # were discovered that way, one per round, each round needing a human.
-      #
-      # ⚠️ THIS IS STRONGER THAN THE NETWORK RULES ABOVE AND THE COMMENT THERE
-      # SHOULD NOT BE REUSED FOR IT. That one says "widens diagnostic reach, not
-      # privilege", which is true of reading a ruleset. It is NOT true here:
-      # `podman run --privileged -v /:/host` as root is unrestricted root, and
-      # sudoers cannot constrain podman by argument any more than it can iptables.
-      #
-      # It is granted anyway on the same ground the whole list rests on:
-      # `nixos-rebuild` and `nix*` are already root-equivalent by construction —
-      # anyone who can build and switch a system closure can already do anything.
-      # So this adds no privilege that was not already here. What it adds is the
-      # ability to answer a question in seconds instead of asking a person to run
-      # a four-minute build to find out.
-      { command = "/run/current-system/sw/bin/podman"; options = [ "NOPASSWD" ]; }
-    ];
-  }];
+    security.sudo.extraConfig = ''
+      Defaults timestamp_type=global
+      Defaults timestamp_timeout=60
+    '';
+
+    security.sudo.extraRules = [{
+      users = [ "oat" ];
+      commands = map (w: {
+        command = "/run/current-system/sw/bin/${w.name}";
+        options = [ "NOPASSWD" ];
+      }) wrappers;
+    }];
+
+    # Restart, not edit: what a unit runs is fixed by its Nix definition, so restarting
+    # one grants no privilege. Explicit list rather than "any unit" because some units
+    # are reachable only to escalate or to take the host down (rescue/emergency,
+    # templated instances whose argument reaches ExecStart).
+    security.polkit.extraConfig = ''
+      polkit.addRule(function (action, subject) {
+        var units = ${builtins.toJSON config.lab.restartableUnits};
+        if (action.id == "org.freedesktop.systemd1.manage-units" &&
+            subject.user == "oat" &&
+            units.indexOf(action.lookup("unit")) >= 0 &&
+            ["start", "stop", "restart"].indexOf(action.lookup("verb")) >= 0) {
+          return polkit.Result.YES;
+        }
+      });
+    '';
+  };
 }

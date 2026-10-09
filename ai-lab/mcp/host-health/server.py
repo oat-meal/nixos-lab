@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 import re
 import subprocess
 import time
@@ -135,6 +136,9 @@ def disk_usage() -> str:
 
 HOSTS = {"server": None, "workstation": "10.100.0.1", "laptop": "10.100.0.3"}
 SYS_PATH = "/run/current-system/sw/bin"
+# Remote probes log in as lab-monitor (no wheel, journal group only) with a key that
+# is authorized nowhere else, so a compromised server is not oat on the other hosts.
+MONITOR_KEY = os.environ.get("LAB_MONITOR_KEY", os.path.expanduser("~/.ssh/lab_monitor"))
 _ESC = re.compile(r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b\[[0-9;?]*[ -/]*[@-~]")
 
 
@@ -153,7 +157,8 @@ def run_on(host_ip, shell_cmd: str, timeout: int = 12) -> str:
     if host_ip is None:
         return _clean(run(["sh", "-c", full], timeout=timeout))
     ssh = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5",
-           "-o", "StrictHostKeyChecking=accept-new", f"oat@{host_ip}", full]
+           "-o", "StrictHostKeyChecking=accept-new",
+           "-o", "IdentitiesOnly=yes", "-i", MONITOR_KEY, f"lab-monitor@{host_ip}", full]
     return _clean(run(ssh, timeout=timeout + 5))
 
 
