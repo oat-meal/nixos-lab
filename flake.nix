@@ -11,6 +11,41 @@
     # Unstable (for Discord, cutting-edge libs, etc.)
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
 
+    # Claude Code — a THIRD nixpkgs, pinned, feeding exactly one package.
+    #
+    # WHY NOT nixpkgs-unstable, MEASURED 2026-10-08. That input has seven
+    # consumers: mango (the desktop compositor, via inputs.nixpkgs.follows
+    # below), ollama-rocm, ollama-vulkan, searxng, sunshine and discord. Bumping
+    # it from 2026-08-02 to 2026-10-08 to reach a newer claude-code was tried and
+    # reverted, because it moved two things nobody asked it to:
+    #
+    #   claude-code   2.1.220 -> 2.1.292   wanted (2.1.287+ for mods)
+    #   ollama-rocm   0.24.0  -> 0.40.0    sixteen minor versions, on the server
+    #   mango                              rebuilt against a newer wlroots
+    #
+    # Both unwanted moves are on load-bearing software. hosts/server has ollama
+    # on unstable specifically because stable 0.21.1 crashed during compute on
+    # Strix Halo, and mango's own comment below records that the wrong wlroots
+    # takes the whole session down on the first keypress after a monitor sleeps.
+    # Neither would have failed at rebuild time on the workstation; both would
+    # have been armed for whenever the server next rebuilt, which is the worst
+    # shape available — correct today, surprising in a month, nothing to
+    # re-derive it.
+    #
+    # WHY A SEPARATE INPUT IS CHEAP HERE AND WOULD NOT BE FOR THE OTHERS.
+    # claude-code is stdenvNoCC.mkDerivation over a prebuilt native binary
+    # fetched from Anthropic's CDN — no Node.js, no compilation, and no stdenv,
+    # kernel, Mesa or ROCm coupling. A second nixpkgs for it costs a parallel
+    # closure (a second glibc plus ripgrep, procps, alsa-lib, bubblewrap, socat)
+    # and rebuilds nothing. The same trick for ollama-rocm would not work: that
+    # one is coupled to ROCm and the kernel, which is why it is pinned by sharing
+    # an input rather than isolated in its own.
+    #
+    # Pinned to the nixos-unstable CHANNEL revision, not a nixpkgs master commit,
+    # so the dependency closure comes from the binary cache instead of building
+    # locally. Bump THIS input alone to move Claude Code; nothing else rides it.
+    nixpkgs-claude.url = "github:NixOS/nixpkgs/e7439b6b14ad3cc35d05608ebca9bce01a25f5f8";
+
     # Home Manager
     home-manager = {
       url = "github:nix-community/home-manager/release-26.05";
@@ -54,15 +89,35 @@
   ################################
   ## FLAKE OUTPUTS
   ################################
-  outputs = { self, nixpkgs, nixpkgs-unstable, home-manager, zen-browser, sops-nix, noctalia, mango, ... }:
+  outputs = { self, nixpkgs, nixpkgs-unstable, nixpkgs-claude, home-manager, zen-browser, sops-nix, noctalia, mango, ... }:
     let
       system = "x86_64-linux";
 
       # Shared overlay for unstable packages
       unstableOverlay = final: prev: {
-        unstable = import nixpkgs-unstable {
+        unstable = (import nixpkgs-unstable {
           inherit system;
           config = prev.config;
+        }) // {
+          # ⚠️ claude-code ALONE comes from its own pinned input, for the reasons
+          # in the nixpkgs-claude comment under inputs. Overridden HERE rather
+          # than at the two call sites -- hosts/common/optional/desktop/apps.nix:61
+          # and installer/default.nix:28, both `unstable.claude-code` -- so that
+          # one name keeps working and no host has to know where it came from. A
+          # call-site change would also have had to be made twice and stay made,
+          # which is the shape this repository has already been bitten by: a fix
+          # applied to one of two parallel consumers leaves the other broken and
+          # leaves its own comment standing beside it as evidence somebody knew.
+          #
+          # The attribute is replaced on the RESULT set, not inside nixpkgs' own
+          # fixpoint, so nothing in unstable's package set resolves against it.
+          # That is correct here and worth stating: claude-code has no reverse
+          # dependencies in this tree, so there is nothing that would want the
+          # pinned one by any route other than this name.
+          claude-code = (import nixpkgs-claude {
+            inherit system;
+            config = prev.config;
+          }).claude-code;
         };
       };
 

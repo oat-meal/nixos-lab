@@ -257,8 +257,19 @@ in
   ################################
   services.ollama = {
     enable = true;
-    # Unstable 0.24.0 ROCm — native gfx1151 support (stable 0.21.1 crashed during
+    # Unstable ROCm — native gfx1151 support (stable 0.21.1 crashed during
     # compute on Strix Halo). Fallback ready: pkgs.unstable.ollama-vulkan.
+    #
+    # ⚠️ THE VERSION IS DELIBERATELY NOT NAMED HERE. This comment read "Unstable
+    # 0.24.0 ROCm" until 2026-10-08, when the pinned input in fact evaluated to
+    # 0.32.5 -- so the prose had drifted eight minor versions behind the thing it
+    # described, with nothing to re-derive it. It then misled a session into
+    # reporting a proposed input bump as "0.24.0 -> 0.40.0, sixteen minor
+    # versions" when the real jump was 0.32.5 -> 0.40.0, eight. A version fixed by
+    # an input and ALSO written in prose is a second source of truth, and the
+    # prose is the copy nobody updates. Ask the input instead:
+    #
+    #   nix eval --raw .#nixosConfigurations.server-nixos.pkgs.unstable.ollama-rocm.version
     package = pkgs.unstable.ollama-rocm;
     # Static user (not DynamicUser) so the dedicated models dataset has stable
     # ownership and can be migrated to a future DAS pool.
