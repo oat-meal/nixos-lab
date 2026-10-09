@@ -114,10 +114,38 @@
           # That is correct here and worth stating: claude-code has no reverse
           # dependencies in this tree, so there is nothing that would want the
           # pinned one by any route other than this name.
+          # ⚠️ AND IT TAKES THIS SYSTEM'S alsa-lib, NOT ITS OWN NIXPKGS'. Measured
+          # 2026-10-08, hours after the pin landed: claude-code's wrapper appends
+          # alsa-lib to LD_LIBRARY_PATH for voice mode, EVERY CHILD PROCESS
+          # INHERITS IT, and the alsa-lib from nixpkgs-claude is built against
+          # glibc 2.44 while this host runs 2.42. So anything launched from a
+          # Claude Code session that loads libasound dies in the loader:
+          #
+          #   godot: .../glibc-2.42-67/lib/libm.so.6: version `GLIBC_2.43' not
+          #          found (required by .../alsa-lib-1.2.16.1/lib/libasound.so.2)
+          #
+          # Four tools broke on this one variable -- godot, Electron, gamescope's
+          # SDL3, and ffmpeg -- and worse, a GATE went silently green: forge's
+          # engine-script-parse runs godot and greps its output for a parse error,
+          # so a godot that dies in the loader produces no such line and the gate
+          # reported "3/3 engine scripts parse" having parsed nothing at all.
+          #
+          # THE OBVIOUS FIX WAS `--unset LD_LIBRARY_PATH` IN A RE-WRAP AND IT IS
+          # THE WORSE ONE. It throws away voice mode's reason for the variable,
+          # and it drops whatever else the parent had put there -- on this host,
+          # pipewire-jack. `alsa-lib` is an ordinary argument of the package, so
+          # handing it the version this system already runs fixes the mismatch at
+          # its source and costs nothing: 1.2.15.3 against glibc 2.42, matching
+          # everything else on the machine. The ABI is stable across that gap.
+          #
+          # `prev` is the STABLE package set here, which is the whole point --
+          # that is where the host's own glibc lives.
           claude-code = (import nixpkgs-claude {
             inherit system;
             config = prev.config;
-          }).claude-code;
+          }).claude-code.override {
+            alsa-lib = prev.alsa-lib;
+          };
         };
       };
 
