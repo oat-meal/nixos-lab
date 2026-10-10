@@ -29,6 +29,11 @@ Until it is, the only protection is same-pool ZFS snapshots.
 Both run in CI (`vm-tests` job) on every push.
 Not proven by VMs: real data volume, restore time at scale, the real disk.
 
+**No off-site copy — by decision** (oat, 2026-10-10): media and data do not leave the premises.
+The archive therefore protects against pool loss, bad deletes and source compromise, not against
+losing the site. An optional on-site equivalent is a cold disk, periodically synced and stored
+disconnected elsewhere in the building.
+
 ## Proposed datasets (decide before enabling)
 
 | Host | Dataset | Size | Why |
