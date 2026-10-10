@@ -56,4 +56,12 @@
   # Private half: ~oat/.ssh/lab_monitor on server-nixos only. Authorized solely for
   # the lab-monitor user, from the server's mesh IP (security/lab-monitor.nix).
   monitorKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILO6GOJZEQUJ84vMpGFH7N2vOoZDqRRXVsFm4ZGqBVLH lab-monitor@server-nixos";
+
+  # SSH host public keys (/etc/ssh/ssh_host_ed25519_key.pub), collected 2026-10-10. Pinned by
+  # the backup archive (lab.backup.target.pulls.*.hostKey) for strict host-key checking.
+  hostKeys = {
+    workstation-nixos = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILbCsmShuAr3cMSEgKPNuRlspkBPkQ3erLPDjifnR8ke";
+    laptop-nixos = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDo5kiAOZFQ98JS5CDXezH2UO4TvjEjc8SZCG7VBWFtI";
+    server-nixos = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKmnAMZLtxP6hJCp2BIM1DDXXfTMwTaWLKva3rG3gREG";
+  };
 }
