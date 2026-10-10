@@ -40,3 +40,20 @@ what is achievable. The repo's own long-running units are the gap — `hy-motion
 Timer-driven oneshots (the sentinels) are not loaded between runs, so the bulk listing
 misses them; their rows above were measured with `systemd-analyze security <unit>`. sshd and rootful podman
 units score high by nature.
+
+## After hardening — 2026-10-10 (ff5b81b)
+
+Measured offline (`systemd-analyze security --offline=true` on the built unit files) before
+and after `hosts/common/sandbox.nix` was applied; the live re-measure follows the deploy.
+
+| Host | Unit | Before | After | What it keeps |
+|---|---|---|---|---|
+| server-nixos | `lab-api` | 8.2 EXPOSED | **1.3 OK** | baseline (DynamicUser, HTTP only) |
+| server-nixos | `search-sentinel` | 8.2 EXPOSED | **1.2 OK** | + MemoryDenyWriteExecute |
+| server-nixos | `fleet-sentinel` | 9.0 UNSAFE | **1.5 OK** | `~/.ssh` writable, `/dev/zfs` only |
+| server-nixos | `hy-motion` | 9.0 UNSAFE | **1.4 OK** | torch: no MDWE, `@resources`, AF_NETLINK; `out-service` rw |
+| workstation-nixos | `gpu-wedge-sentinel` | 9.0 UNSAFE | **1.8 OK** | devices + full `/proc` (sysfs, rocm-smi, ps) |
+| server-nixos | `update-advisor` | 9.0 UNSAFE | **4.0 OK** | light only: `nix flake update` as oat writes `~/.cache` |
+
+(Offline "before" scores differ slightly from the live table above — 9.0 vs 9.2 — because the
+live measurement includes runtime state such as the unit's actual user.)
