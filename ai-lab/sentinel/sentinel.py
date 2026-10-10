@@ -23,6 +23,30 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
+# Ollama 0.40 + qwen3 can return reasoning inside the answer even with think:false —
+# either a full <think>…</think> block or reasoning ending in a bare </think> (seen
+# 2026-10-10). Keep only what follows it. A no-op for models that never emit it.
+_THINK_BLOCK = re.compile(r"(?s)<think>.*?</think>")
+
+
+def strip_reasoning(text: str) -> str:
+    text = _THINK_BLOCK.sub("", text)
+    if "</think>" in text:
+        text = text.rsplit("</think>", 1)[1]
+    return text.strip()
+
+
+def parse_json_reply(text: str):
+    """JSON from an LLM reply: reasoning stripped; prose around the object tolerated."""
+    text = strip_reasoning(text)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        i, j = text.find("{"), text.rfind("}")
+        if i != -1 and j > i:
+            return json.loads(text[i:j + 1])
+        raise
+
 HOSTS = {"server": None, "workstation": "10.100.0.1", "laptop": "10.100.0.3"}
 SYS_PATH = "/run/current-system/sw/bin"
 OLLAMA = os.environ.get("OLLAMA_HOST_URL", "http://10.100.0.2:11434")
@@ -253,12 +277,18 @@ def enrich(candidates: list, journal_by_host: dict) -> dict:
             {"role": "user", "content": json.dumps(payload, indent=2)},
         ],
     }
-    req = urllib.request.Request(
-        OLLAMA + "/api/chat", data=json.dumps(body).encode(),
-        headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=300) as r:
-        resp = json.load(r)
-    return json.loads(resp["message"]["content"])
+    last_err = None
+    for _attempt in range(2):   # one retry: a malformed reply was seen once in two runs
+        req = urllib.request.Request(
+            OLLAMA + "/api/chat", data=json.dumps(body).encode(),
+            headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=300) as r:
+            resp = json.load(r)
+        try:
+            return parse_json_reply(resp["message"]["content"])
+        except json.JSONDecodeError as e:
+            last_err = e
+    raise last_err
 
 
 def _overall(findings: list) -> str:

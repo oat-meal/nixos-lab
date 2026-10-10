@@ -18,6 +18,18 @@ import re
 import sys
 import urllib.request
 
+# Ollama 0.40 + qwen3 can return reasoning inside the answer even with think:false —
+# either a full <think>…</think> block or reasoning ending in a bare </think> (seen
+# 2026-10-10). Keep only what follows it. A no-op for models that never emit it.
+_THINK_BLOCK = re.compile(r"(?s)<think>.*?</think>")
+
+
+def strip_reasoning(text: str) -> str:
+    text = _THINK_BLOCK.sub("", text)
+    if "</think>" in text:
+        text = text.rsplit("</think>", 1)[1]
+    return text.strip()
+
 OLLAMA = f"http://{os.environ.get('OLLAMA_HOST', '10.100.0.2:11434')}"
 CHROMA = f"http://{os.environ.get('CHROMA_HOST', '10.100.0.2:8000')}"
 EMBED_MODEL = os.environ.get("RAG_EMBED_MODEL", "nomic-embed-text")
@@ -106,6 +118,7 @@ def query(question: str, k: int = 4) -> int:
     )
     ans = _req(f"{OLLAMA}/api/generate",
                {"model": ANSWER_MODEL, "prompt": prompt, "stream": False})["response"]
+    ans = strip_reasoning(ans)
     print(f"\n== Answer ({ANSWER_MODEL}) ==\n{ans.strip()}")
     return 0
 

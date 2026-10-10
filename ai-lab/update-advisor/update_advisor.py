@@ -16,6 +16,31 @@ import sys
 import tempfile
 import urllib.request
 from datetime import datetime
+import re
+
+# Ollama 0.40 + qwen3 can return reasoning inside the answer even with think:false —
+# either a full <think>…</think> block or reasoning ending in a bare </think> (seen
+# 2026-10-10). Keep only what follows it. A no-op for models that never emit it.
+_THINK_BLOCK = re.compile(r"(?s)<think>.*?</think>")
+
+
+def strip_reasoning(text: str) -> str:
+    text = _THINK_BLOCK.sub("", text)
+    if "</think>" in text:
+        text = text.rsplit("</think>", 1)[1]
+    return text.strip()
+
+
+def parse_json_reply(text: str):
+    """JSON from an LLM reply: reasoning stripped; prose around the object tolerated."""
+    text = strip_reasoning(text)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        i, j = text.find("{"), text.rfind("}")
+        if i != -1 and j > i:
+            return json.loads(text[i:j + 1])
+        raise
 
 NIXOS = os.environ.get("NIXOS_DIR", "/etc/nixos")
 OLLAMA = os.environ.get("OLLAMA_HOST_URL", "http://10.100.0.2:11434")
@@ -113,7 +138,7 @@ def summarize(changes):
     req = urllib.request.Request(OLLAMA + "/api/chat", data=json.dumps(body).encode(),
                                  headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=300) as r:
-        return json.loads(json.load(r)["message"]["content"])
+        return parse_json_reply(json.load(r)["message"]["content"])
 
 
 def main():

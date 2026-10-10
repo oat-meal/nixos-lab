@@ -14,6 +14,19 @@ import os
 import sys
 import urllib.parse
 import urllib.request
+import re
+
+# Ollama 0.40 + qwen3 can return reasoning inside the answer even with think:false —
+# either a full <think>…</think> block or reasoning ending in a bare </think> (seen
+# 2026-10-10). Keep only what follows it. A no-op for models that never emit it.
+_THINK_BLOCK = re.compile(r"(?s)<think>.*?</think>")
+
+
+def strip_reasoning(text: str) -> str:
+    text = _THINK_BLOCK.sub("", text)
+    if "</think>" in text:
+        text = text.rsplit("</think>", 1)[1]
+    return text.strip()
 
 SEARX = f"http://{os.environ.get('SEARX_HOST', '10.100.0.2:8888')}"
 OLLAMA = f"http://{os.environ.get('OLLAMA_HOST', '10.100.0.2:11434')}"
@@ -47,7 +60,7 @@ def synthesize(question: str, sources: list[dict], model: str) -> str:
     req = urllib.request.Request(f"{OLLAMA}/api/generate", data=body,
                                  headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=300) as r:
-        return json.loads(r.read())["response"].strip()
+        return strip_reasoning(json.loads(r.read())["response"])
 
 
 def main() -> int:
