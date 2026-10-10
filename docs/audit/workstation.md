@@ -181,7 +181,7 @@ WiFi shutdown cleanup service exists for ath12k driver issues (`systemd.services
 - Scoped passwordless sudo added
 - NFS mount changed from LAN hostname to WireGuard IP (10.100.0.2)
 - sops-nix added for WireGuard private key management
-- Syncthing active (claude-context, git-crypt-keys)
+- Syncthing active (claude-context, git-crypt-keys) — git-crypt-keys folder removed 2026-10-09
 
 ### 2026-06-03 — Full Configuration Audit
 

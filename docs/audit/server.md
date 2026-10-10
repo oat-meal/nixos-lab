@@ -82,11 +82,11 @@ incompatible with unattended boot.
 
 - **Role**: Headless home server
 - **Remote access**: SSH and Mosh (wg0-only, key-only, no root)
-- **Sudo**: password (60 min global cache); NOPASSWD only for `lab-fw-dump`, `lab-listeners`, `lab-podman-probe` (2026-10-09; the udevadm rule had no consumer and was dropped)
+- **Sudo**: password, cached per terminal for 15 min (`lab.sudoCache`, 35645db; the workstation and laptop keep 60 min global); NOPASSWD only for `lab-fw-dump`, `lab-listeners`, `lab-podman-probe`
 - **Services**: Ollama (ROCm GPU), Jellyfin, AdGuard Home, NFS server, plus the AI-lab stack (see docs/ai-lab.md)
 - **AdGuard Home**: as of 2026-10-09 its query log shows no queries since 2026-08-16 — LAN clients and the
   server resolve via the router; it is not in the resolution path. Its admin API has no login (wg0-only).
-- **NFS**: Exports `/storage` to WireGuard subnet (root_squash)
+- **NFS**: Exports `/storage` to the workstation's mesh IP only (rw, root_squash; a145140 — was the whole mesh /24)
 - **ZFS ARC**: 32GB
 - **ZFS maintenance**: Monthly scrub, auto-snapshots (frequent/hourly/daily/weekly/monthly)
 - **Security**: Fail2ban, SSH hardened (MaxAuthTries=3, no X11/TCP forwarding), kernel hardening, audit logging, SMART monitoring

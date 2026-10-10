@@ -234,7 +234,7 @@ IPs and keys are in `hosts/network.nix`. The network topology:
 | `laptop-nixos` | 10.100.0.3 |
 - **NordVPN** (`wgnord`): outbound VPN via wgnord on workstation-nixos and laptop-nixos
 - **Syncthing**: file sync across all hosts (LAN-only, no relays). Syncs `~/.claude/`; the server is receive-only
-- **NFS**: server exports `/storage` to WireGuard subnet (encrypted in transit)
+- **NFS**: server exports `/storage` to the workstation only, over the WireGuard mesh (encrypted in transit)
 
 ## Security
 

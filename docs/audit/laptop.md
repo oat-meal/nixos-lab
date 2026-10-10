@@ -72,7 +72,7 @@ No full on-host audit performed yet. Schedule when next on laptop.
 - All host keys authorized (full mesh)
 - Scoped passwordless sudo added
 - sops-nix added for WireGuard private key management
-- Syncthing active (claude-context, git-crypt-keys)
+- Syncthing active (claude-context, git-crypt-keys) — git-crypt-keys folder removed 2026-10-09
 
 ### 2026-06-03 — Full Configuration Audit
 

@@ -29,7 +29,7 @@ others. Git runs as `<user>`; only `nixos-rebuild` uses sudo.
    In order, this runs:
    - **Pre-flight:** `nix eval` of every target config — aborts before
      changing anything if a host does not evaluate.
-   - **Rebuild local** from the committed git tree.
+   - **Rebuild local** from the working tree (uncommitted edits apply locally; remote targets refuse a dirty tree).
    - **Push** to `origin/main`.
    - **Per remote:** `git pull --rebase` (as `<user>`) → `sudo nixos-rebuild
      switch`, each gated by a `[y/N]` confirm.
