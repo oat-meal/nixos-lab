@@ -121,7 +121,7 @@ nixos-lab/
 │   │       ├── dev/                 # Game-dev tooling (gamedev.nix)
 │   │       ├── gaming/              # Steam, GameMode, Vulkan
 │   │       ├── hardware/            # AMD, Bluetooth, Framework, printing, DisplayLink (inactive)
-│   │       ├── monitoring/          # Post-rebuild verifier, GPU-wedge sentinel, update advisor, AMD-stack smoke test (imported by no host)
+│   │       ├── monitoring/          # Post-rebuild verifier, GPU-wedge sentinel, heartbeat dead-man switch, update advisor, AMD-stack smoke test (imported by no host)
 │   │       ├── networking/          # Firewall, NordVPN, SSH, WiFi, WireGuard, Syncthing, Tailscale, sops
 │   │       ├── power/               # Performance, portable, hibernate
 │   │       ├── security/            # LUKS/FIDO2, YubiKey, PAM U2F, sudo
@@ -249,6 +249,7 @@ IPs and keys are in `hosts/network.nix`. The network topology:
 - Server automation reaches other hosts as `lab-monitor` (journal access only), never as the user
 - SSH restricted to WireGuard mesh: `openFirewall = false`, `ListenAddress` bound to each host's WireGuard IP, fail2ban on all hosts
 - Firewall enabled on all hosts; admin services (SSH, Mosh, Ollama, AdGuard UI) restricted to `wg0` interface
+- Per-peer trust zones on `wg0` (`lab.meshZones`, `networking/mesh-zones.nix`): narrow what one mesh peer may open on a host. Built and tested; **no zone declared yet**, so every peer still reaches every `wg0` port
 - sops-nix for private keys; no other encrypted material in the repo
 - Kernel hardening with loose rp_filter for WireGuard compatibility
 - NordVPN via WireGuard (wgnord)
@@ -268,6 +269,8 @@ The lab also **self-monitors**: a nightly fleet-health + snapshot-freshness sent
 post-rebuild verifier (server + laptop), a GPU-wedge sentinel (workstation), a SearXNG
 search-sentinel (server, 08:15/20:15), and a weekly flake-update advisor —
 all pushing to a private self-hosted ntfy hub (bridged into the desktops' notifications).
+Because that hub lives on the server, a heartbeat dead-man switch watches it from the
+workstation and alerts locally when the server goes quiet.
 Claude Code drives it through a read-only host-health MCP server (fleet health, backups,
 snapshots, flake status).
 

@@ -46,12 +46,14 @@
     ../common/optional/ai/kokoro.nix
     ../common/optional/ai/hy-motion.nix          # text-to-motion; CPU-only, no vendor exists for this
     ../common/optional/ai/ntfy.nix
+    ../common/optional/monitoring/heartbeat.nix   # publishes; the workstation watches
   ];
 
   ################################
   ## Host identity
   ################################
   networking.hostName = "server-nixos";
+  lab.heartbeat.publish.enable = true;   # watched from the workstation (monitoring/heartbeat.nix)
   system.stateVersion = "25.11";
   networking.hostId = "dc598b84";
 
@@ -418,6 +420,7 @@
 
   # Units oat may start/stop/restart without sudo (polkit; see security/sudo.nix).
   lab.restartableUnits = [
+    "lab-heartbeat.service"
     "adguardhome.service"
     "chromadb.service"
     "homepage-dashboard.service"

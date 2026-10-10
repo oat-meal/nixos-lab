@@ -217,6 +217,7 @@
         recovery-drill = import ./tests/recovery-drill.nix { pkgs = nixpkgs.legacyPackages.${system}; };
         security-policy = import ./tests/security-policy.nix { pkgs = nixpkgs.legacyPackages.${system}; };
         backup = import ./tests/backup.nix { pkgs = nixpkgs.legacyPackages.${system}; };
+        heartbeat = import ./tests/heartbeat.nix { pkgs = nixpkgs.legacyPackages.${system}; };
       };
 
       ############################################################

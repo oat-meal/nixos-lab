@@ -82,7 +82,14 @@
     # reboot) you will not guess. Carries no boot-ordering risk — no Persistent timer,
     # no wants=network-online.target. See the module header for the 2026-08-16 chain.
     ../common/optional/monitoring/gpu-wedge-sentinel.nix
+
+    # Watches the server's heartbeat (lab.heartbeat.watch below).
+    ../common/optional/monitoring/heartbeat.nix
   ];
+
+  # Off-host dead-man switch: alerts on THIS desktop when the server stops publishing,
+  # without going through the server (postmortem action item #3, closed by this).
+  lab.heartbeat.watch.enable = true;
 
   ################################
   ## Host identity
@@ -349,6 +356,7 @@
   # Units oat may start/stop/restart without sudo (polkit; see security/sudo.nix).
   lab.restartableUnits = [
     "podman-comfyui-render.service"
+    "lab-heartbeat-watch.service"
     "gpu-wedge-sentinel.service"
     "syncthing.service"
     "wireguard-wg0.service"
