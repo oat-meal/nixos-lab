@@ -833,6 +833,11 @@ setup_config() {
     rm -rf /mnt/etc/nixos
     run cp -a "$flake_source" /mnt/etc/nixos
 
+    # Cloned over HTTPS because the ISO has no GitHub key, but HTTPS cannot push. Point the
+    # installed copy at SSH so the host can push its installer commit once oat's key is on
+    # GitHub, instead of the commit being stranded on this one disk.
+    run git -C /mnt/etc/nixos remote set-url origin git@github.com:oat-meal/nixos-lab.git
+
     # Place hardware-configuration.nix
     cp /tmp/hardware-configuration.nix "/mnt/etc/nixos/${host_dir}/hardware-configuration.nix"
 
@@ -948,8 +953,17 @@ inject_nix_config() {
     # Build the config block to inject
     local inject=""
 
-    # hostId (required for ZFS)
-    if ! grep -q "networking.hostId" "$hw_file"; then
+    # hostId (required for ZFS). If the host module already pins one (server-nixos sets it
+    # in default.nix, matched by its spl.spl_hostid kernel parameter), adopt that value and
+    # inject nothing: two definitions do not merge, and the install fails to evaluate with
+    # "networking.hostId has conflicting definition values" (verified 2026-10-10).
+    local host_default pinned_id
+    host_default="$(dirname "$hw_file")/default.nix"
+    pinned_id=$(sed -n 's/^ *networking\.hostId = "\([0-9a-f]\{8\}\)";.*/\1/p' "$host_default" 2>/dev/null | head -1)
+    if [[ -n "$pinned_id" ]]; then
+        HOST_ID="$pinned_id"
+        info "hostId pinned by ${host_default##*/etc/nixos/}: $HOST_ID (not injected)"
+    elif ! grep -q "networking.hostId" "$hw_file"; then
         inject+=$'\n'"  # Required for ZFS"$'\n'
         inject+="  networking.hostId = \"${HOST_ID}\";"$'\n'
     fi
@@ -1133,39 +1147,25 @@ post_install() {
     echo -e "  ${GREEN}[x]${NC} hostId: $HOST_ID"
     echo -e "  ${GREEN}[x]${NC} host config committed to git (hostId + LUKS block in HEAD)"
     echo ""
-    echo -e "  ${YELLOW}!${NC} ${BOLD}Push this host's config to origin${NC} so the shared repo carries it"
-    echo -e "     (matches workstation/laptop; prevents the block being dropped on deploy):"
-    echo "       git -C /etc/nixos push"
+    echo -e "  ${YELLOW}!${NC} ${BOLD}Push this host's config to origin${NC} so the shared repo carries it."
+    echo "     origin is set to SSH; if this host's key is not on GitHub yet, copy"
+    echo "     hardware-configuration.nix to the workstation and commit it there."
     echo ""
-
+    echo -e "  ${BOLD}Next steps:${NC} docs/bare-metal-rebuild.md (in /etc/nixos). In short:"
+    echo "  1. Set user password below"
+    echo "  2. Reboot, enter the LUKS passphrase"
+    echo "  3. From a surviving host: re-key sops for this host's new SSH key, update"
+    echo "     hostKeys + Syncthing ID in hosts/network.nix, commit, deploy"
     case "$HOST" in
-        laptop-nixos)
-            echo -e "  ${BOLD}Next steps:${NC}"
-            echo "  1. Set user password below"
-            echo "  2. Reboot — enter LUKS passphrase (or tap YubiKey if enrolled)"
-            echo "  3. Verify: zpool status"
-            echo "  4. Test hibernate: systemctl hibernate"
-            echo "  5. Enroll additional YubiKeys:"
-            echo "     systemd-cryptenroll ${DISK1}p2 --fido2-device=auto"
-            echo "  6. Restore home data from backup"
+        server-nixos)
+            echo "  4. Server: initrd SSH key, TPM2 re-enrolment, lab_monitor key,"
+            echo "     ComfyUI image, Ollama models (all listed in the doc)"
             ;;
         workstation-nixos)
-            echo -e "  ${BOLD}Next steps:${NC}"
-            echo "  1. Set user password below"
-            echo "  2. Reboot — enter LUKS passphrase (or tap YubiKey if enrolled)"
-            echo "  3. Verify: zpool status"
-            echo "  4. Test gaming performance"
-            echo "  5. Enroll additional YubiKeys on all LUKS volumes"
-            echo "  6. Monitor ARC: arc_summary"
+            echo "  4. Workstation: ComfyUI render image; recreate the storage pool if it was lost"
             ;;
-        server-nixos)
-            echo -e "  ${BOLD}Next steps:${NC}"
-            echo "  1. Set user password below"
-            echo "  2. Reboot — enter LUKS passphrase (or tap YubiKey if enrolled)"
-            echo "  3. Verify rpool mirror: zpool status"
-            echo "  4. Connect USB-C DAS, create LUKS + tank pool"
-            echo "  5. Enroll additional YubiKeys on all LUKS volumes"
-            echo "  6. Configure Turris, services (Phase 4)"
+        laptop-nixos)
+            echo "  4. Laptop: test hibernate (systemctl hibernate); optional YubiKey enrolment"
             ;;
     esac
 

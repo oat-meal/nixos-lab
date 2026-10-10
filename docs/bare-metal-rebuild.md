@@ -45,17 +45,16 @@ is regenerated, only re-encrypted for the new host key.
 
 1. **Install.** Boot the ISO, `nmtui`, `install-nixos`. The installer partitions,
    creates the LUKS2 + ZFS layout, clones this repo, generates
-   `hardware-configuration.nix` with a new `hostId` and LUKS block, commits it
-   locally and runs `nixos-install`. Server: fix the hostId conflict **before**
-   it builds (see the trap below).
+   `hardware-configuration.nix` with the LUKS block and a `hostId` (new, unless the
+   host module pins one: see below), commits it locally and runs `nixos-install`.
 2. **First boot.** Expect `wg0` to be down and any sops-backed unit to fail: the
    new host key cannot decrypt anything yet. LAN SSH works.
 3. **Publish the host commit.** The installer commits the new `hardware-configuration.nix`
-   in the host's clone, which was cloned over HTTPS and cannot push. Copy the file to the
-   workstation, commit and push it there, then on the rebuilt host
-   `git remote set-url origin git@github.com:oat-meal/nixos-lab.git` and
-   `git fetch && git reset --hard origin/main`. Until it is on GitHub, the only record
-   of the new UUIDs and hostId is that one disk.
+   in the host's clone. The installer points `origin` at SSH, so `git push` works once
+   the host's user key is on GitHub. Otherwise copy the file to the workstation,
+   commit and push it there, then `git fetch && git reset --hard origin/main` on the
+   rebuilt host. Until it is on GitHub, the only record of the new UUIDs and hostId
+   is that one disk.
 4. **Re-key sops** on a surviving host, in `/etc/nixos`, as oat (never sudo for
    anything that writes the repo):
    ```bash
@@ -104,12 +103,11 @@ regenerate instead of re-keying:
    `bash secrets/init-sops.sh` to write and encrypt the private keys.
 3. Steps 4–8 above for every host, then deploy all.
 
-## Trap: server hostId
+## Server hostId (was a trap, fixed 2026-10-10)
 
-The installer injects `networking.hostId` into the new `hardware-configuration.nix`,
-and `hosts/server/default.nix` already sets it (with `spl.spl_hostid` matching).
-Two values do not merge. Verified 2026-10-10 by evaluating the server
-configuration with a second hostId:
+`hosts/server/default.nix` pins `networking.hostId` (with `spl.spl_hostid` matching).
+Until 2026-10-10 the installer also injected a random one into
+`hardware-configuration.nix`, and two values do not merge:
 
 ```
 error: The option `networking.hostId' has conflicting definition values:
@@ -117,12 +115,12 @@ error: The option `networking.hostId' has conflicting definition values:
 - In `<unknown-file>': "deadbeef"
 ```
 
-Before the install builds, delete the injected `networking.hostId` line from
-`hosts/server/hardware-configuration.nix`. The new pool was created with the
-installer's hostId, so either set `hosts/server/default.nix` and the
-`spl.spl_hostid=0x…` kernel parameter to that value, or run `zgenhostid
-dc598b84` in the installer before `nixos-install`. Workstation and laptop keep
-their hostId only in `hardware-configuration.nix`, so they are not affected.
+The installer now reads a hostId pinned in the host's `default.nix`, adopts it and
+injects nothing. Checked by running the installer's `inject_nix_config` against
+a copy of the repo: the old script reproduces the error above, the new one evaluates
+with `dc598b84`, and the laptop (no pin) still gets an injected hostId. The pool is
+created under the ISO's hostid either way, and `boot.zfs.forceImportRoot` (on
+fleet-wide) imports it on first boot.
 
 ## Verify
 
