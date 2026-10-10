@@ -9,7 +9,8 @@
 #   the parent; --use-hold holds on both sides; archive pruning drops hourlies and keeps
 #   dailies; parent is readonly + unmounted + quota'd; zfs-send can send but not destroy;
 #   its key is refused from any address but the archive's; the source holds no
-#   credential for the archive; and a destroyed source pool restores byte-for-byte.
+#   credential for the archive; a destroyed source pool restores byte-for-byte; and the
+#   opt-in host-key copy is root-only, follows a key change, and restores byte-for-byte.
 # Every negative is paired with a positive control.
 { pkgs }:
 
@@ -42,6 +43,7 @@ pkgs.testers.runNixOSTest {
         datasets = [ "tank/data" ];
         targetAddress = archiveIP;
         targetKey = read "backup_target.pub";
+        hostKeys = { enable = true; dataset = "tank/lab-hostkeys"; };
       };
       services.sanoid.extraArgs = [ "--verbose" ];   # test-only: decisions in the journal
       # Pinned host key, so the archive's strict known_hosts check is what gets tested.
@@ -59,6 +61,7 @@ pkgs.testers.runNixOSTest {
         pulls = {
           src = { host = sourceIP; dataset = "tank/data"; hostKey = read "source_host.pub"; };
           self = { host = null; dataset = "vault/local"; };     # local pull, no ssh
+          keys = { host = sourceIP; dataset = "tank/lab-hostkeys"; hostKey = read "source_host.pub"; };
         };
       };
     };
@@ -108,6 +111,17 @@ pkgs.testers.runNixOSTest {
     assert props == ["on", "none", "off", "800M"], props
     ok("archive parent: readonly, unmounted, quota 800M")
 
+    # Host-key copy: root-only, identical to /etc/ssh. Control: a non-root user can read
+    # the .pub in /etc/ssh, so a refusal below is the directory mode, not a missing file.
+    mp = "/var/lib/lab-hostkeys"
+    assert S.succeed(f"stat -c '%a %U' {mp}").split() == ["700", "root"]
+    S.succeed(f"cmp /etc/ssh/ssh_host_ed25519_key {mp}/ssh/ssh_host_ed25519_key")
+    assert S.succeed(f"stat -c %a {mp}/ssh/ssh_host_ed25519_key").strip() == "600"
+    S.succeed("su -s /bin/sh nobody -c 'cat /etc/ssh/ssh_host_ed25519_key.pub' >/dev/null")
+    S.fail(f"su -s /bin/sh nobody -c 'cat {mp}/ssh/ssh_host_ed25519_key.pub'")
+    assert "send" in S.succeed("zfs allow tank/lab-hostkeys")
+    ok("host keys: copied root-only (700/600), identical to /etc/ssh, delegated for send")
+
     # Data, a git repo, and a checksum manifest.
     S.succeed(
         "cd /srv/data && head -c 8M /dev/urandom > blob && git init -q repo && echo hi > repo/f && "
@@ -140,6 +154,7 @@ pkgs.testers.runNixOSTest {
     # Pull: both syncoid jobs run as the real services.
     run(A, "syncoid-src.service")
     run(A, "syncoid-self.service")
+    run(A, "syncoid-keys.service")
     got = snaps(A, "vault/backups/src")
     assert any("_daily" in n for n in got) and any("_monthly" in n for n in got), got
     assert snaps(A, "vault/backups/self"), "local pull landed nothing"
@@ -177,6 +192,23 @@ pkgs.testers.runNixOSTest {
     assert "permission denied" in out.lower(), out
     ok("source -> archive: sshd reachable, no credential (permission denied)")
 
+    # Host keys restore: received into a scratch dataset on the archive, compared with the
+    # source's live key — this is what docs/bare-metal-rebuild.md restores before step 4.
+    # A key change is picked up on the next run (control: the copy differs before it).
+    S.succeed(f"echo rotated > /root/k && install -m600 /root/k {mp}/ssh/ssh_host_ed25519_key")
+    S.fail(f"cmp -s /etc/ssh/ssh_host_ed25519_key {mp}/ssh/ssh_host_ed25519_key")
+    S.succeed("systemctl restart lab-backup-source.service")
+    S.succeed(f"cmp /etc/ssh/ssh_host_ed25519_key {mp}/ssh/ssh_host_ed25519_key")
+    S.succeed("zfs snapshot tank/lab-hostkeys@autosnap_2026-10-10_00:00:00_daily")
+    run(A, "syncoid-keys.service")
+    k = snaps(A, "vault/backups/keys")[-1]
+    A.succeed(f"zfs send {k} | zfs receive -o mountpoint=/mnt/keys vault/keysrestore")
+    want = S.succeed("sha256sum < /etc/ssh/ssh_host_ed25519_key").split()[0]
+    got_k = A.succeed("sha256sum < /mnt/keys/ssh/ssh_host_ed25519_key").split()[0]
+    assert got_k == want, (got_k, want)
+    assert A.succeed("stat -c %a /mnt/keys/ssh/ssh_host_ed25519_key").strip() == "600"
+    ok("host keys: change re-copied; pulled copy restores byte-identical with mode 600")
+
     # Disaster and restore (operator path), then verify byte-for-byte.
     S.succeed("zpool destroy tank && wipefs -a /dev/vdb && zpool create -O mountpoint=none tank /dev/vdb")
     newest = snaps(A, "vault/backups/src")[-1]
@@ -187,7 +219,7 @@ pkgs.testers.runNixOSTest {
     S.succeed("git -C /srv/data/repo fsck --full")
     ok(f"restore: {files} files byte-identical, git fsck ok")
 
-    print(f"BACKUP-MODULE: {checks}/10 checks passed")
-    assert checks == 10, checks
+    print(f"BACKUP-MODULE: {checks}/12 checks passed")
+    assert checks == 12, checks
   '';
 }

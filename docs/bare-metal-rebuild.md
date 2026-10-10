@@ -13,7 +13,7 @@ in a VM. A real rebuild is what proves this page. Update it after the first one.
 
 | State | Where it lives | If lost | Recovery |
 |---|---|---|---|
-| SSH host key | `/etc/ssh/ssh_host_ed25519_key` | sops age identity changes, so `secrets/secrets.yaml` no longer decrypts on that host; pinned host keys break | Re-key sops (step 4), update `hostKeys` in `hosts/network.nix` |
+| SSH host key | `/etc/ssh/ssh_host_ed25519_key` | sops age identity changes, so `secrets/secrets.yaml` no longer decrypts on that host; pinned host keys break | Restore from the archive if `lab.backup.source.hostKeys` was on; else re-key sops (step 4) and update `hostKeys` in `hosts/network.nix` |
 | LUKS passphrases | your memory / password manager | disk cannot be unlocked | none: keep them somewhere off the lab |
 | ZFS `hostId` | `hardware-configuration.nix` (server: `hosts/server/default.nix` + `spl.spl_hostid`) | installer generates a new one | see **Trap: server hostId** |
 | User passwords | `/etc/shadow` (`mutableUsers`, no hash in git) | no password | `passwd oat` (step 5) |
@@ -55,7 +55,11 @@ is regenerated, only re-encrypted for the new host key.
    commit and push it there, then `git fetch && git reset --hard origin/main` on the
    rebuilt host. Until it is on GitHub, the only record of the new UUIDs and hostId
    is that one disk.
-4. **Re-key sops** on a surviving host, in `/etc/nixos`, as oat (never sudo for
+4. **Restore the host keys, or re-key sops.** If the host had `lab.backup.source.hostKeys`
+   enabled, copy its keys back from the archive (receive the newest
+   `<parent>/<host>-hostkeys` snapshot into a scratch dataset with a mountpoint, then copy
+   `ssh/*` to `/etc/ssh/` with the same modes) and reboot: sops decrypts and every pinned key
+   still matches, so the rest of this step is skipped. Otherwise **re-key sops** on a surviving host, in `/etc/nixos`, as oat (never sudo for
    anything that writes the repo):
    ```bash
    ssh-keyscan -t ed25519 <lan-ip> 2>/dev/null | nix-shell -p ssh-to-age --run ssh-to-age

@@ -20,6 +20,9 @@
 
 let
   cfg = config.lab.backup;
+  hk = cfg.source.hostKeys;
+  # Datasets the source offers: the listed ones plus, opted in, the host-key copy.
+  sourceDatasets = cfg.source.datasets ++ lib.optional hk.enable hk.dataset;
   inherit (lib) mkOption mkEnableOption mkIf mkMerge types;
   zfs = config.boot.zfs.package;
 in
@@ -39,6 +42,24 @@ in
       targetKey = mkOption {
         type = types.str;
         description = "Public key of the target's syncoid user.";
+      };
+      # A rebuilt host gets new SSH host keys unless the old ones come back, and a new key
+      # means a sops re-key plus new pins everywhere (docs/bare-metal-rebuild.md step 4).
+      # Restoring the old key makes that step a copy. Off by default because it puts this
+      # host's private keys on the archive: whoever holds root on the archive host (or its
+      # syncoid key) can then impersonate this host over ssh. sops is no worse off — any
+      # one host key already decrypts all of secrets/secrets.yaml.
+      hostKeys = {
+        enable = mkEnableOption "copying /etc/ssh host keys (and the initrd key) into a backed-up dataset";
+        dataset = mkOption {
+          type = types.str;
+          default = "rpool/lab-hostkeys";
+          description = "Dataset created for the copy; added to the pulled datasets.";
+        };
+        mountpoint = mkOption {
+          type = types.str;
+          default = "/var/lib/lab-hostkeys";
+        };
       };
     };
 
@@ -101,13 +122,28 @@ in
         description = "Backup source: delegate send,hold,release; opt out of zfs-auto-snapshot";
         wantedBy = [ "multi-user.target" ];
         after = [ "zfs.target" ];
-        restartTriggers = [ (builtins.toJSON cfg.source.datasets) ];
-        path = [ zfs ];
+        restartTriggers = [ (builtins.toJSON sourceDatasets) ];
+        path = [ zfs pkgs.util-linux pkgs.diffutils ];
         serviceConfig = { Type = "oneshot"; RemainAfterExit = true; };
-        script = lib.concatMapStrings (ds: ''
+        # Host keys: copied only when they differ, so an unchanged key adds nothing to the
+        # snapshots. Root-only; zfs send carries the modes to the archive.
+        script = lib.optionalString hk.enable ''
+          ds=${lib.escapeShellArg hk.dataset}; mp=${lib.escapeShellArg hk.mountpoint}
+          zfs list -H "$ds" >/dev/null 2>&1 || zfs create -o mountpoint="$mp" "$ds"
+          mountpoint -q "$mp" || zfs mount "$ds"
+          chown root:root "$mp"; chmod 0700 "$mp"
+          copy() { cmp -s "$1" "$2" 2>/dev/null || install -D -p -m "$3" "$1" "$2"; }
+          for k in /etc/ssh/ssh_host_*_key; do
+            [ -f "$k" ] || continue
+            copy "$k" "$mp/ssh/''${k##*/}" 0600
+            [ -f "$k.pub" ] && copy "$k.pub" "$mp/ssh/''${k##*/}.pub" 0644
+          done
+          [ -f /etc/secrets/initrd/ssh_host_ed25519_key ] && \
+            copy /etc/secrets/initrd/ssh_host_ed25519_key "$mp/initrd/ssh_host_ed25519_key" 0600
+        '' + lib.concatMapStrings (ds: ''
           zfs allow -u zfs-send send,hold,release ${lib.escapeShellArg ds}
           zfs set com.sun:auto-snapshot=false ${lib.escapeShellArg ds}
-        '') cfg.source.datasets;
+        '') sourceDatasets;
       };
 
       services.sanoid = {
@@ -116,7 +152,7 @@ in
           hourly = 24; daily = 3; monthly = 1; yearly = 0;
           autosnap = true; autoprune = true;
         };
-        datasets = lib.genAttrs cfg.source.datasets (_: { useTemplate = [ "lab-source" ]; });
+        datasets = lib.genAttrs sourceDatasets (_: { useTemplate = [ "lab-source" ]; });
       };
     })
 

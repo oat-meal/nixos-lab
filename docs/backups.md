@@ -18,13 +18,19 @@ Until it is, the only protection is same-pool ZFS snapshots.
   pool they share (the 20 TB disk also holds `media/library`).
 - **Opt-ins are declared.** Listed datasets get `com.sun:auto-snapshot=false`, so the older
   hand-set zfs-auto-snapshot path does not snapshot them twice.
+- **SSH host keys (opt-in, `source.hostKeys.enable`).** Copies `/etc/ssh/ssh_host_*` and the
+  server's initrd key into a root-only dataset (`rpool/lab-hostkeys`, mode 700) that is pulled
+  like any other. Restoring them makes a rebuilt host keep its identity, so sops decrypts and
+  every pin holds without a re-key (`docs/bare-metal-rebuild.md`). **Trade-off:** root on the
+  archive host, or its syncoid key, can then impersonate that host over ssh. sops is no worse
+  off: any one host key already decrypts all of `secrets/secrets.yaml`. Decide per host.
 
 ## Proof
 
 | Check | What it proves | Result |
 |---|---|---|
 | `checks.recovery-drill` | the design restores (pull, send-only source, disaster → restore) | 29 files, checksums match, git fsck |
-| `checks.backup` | **this module**, real sanoid/syncoid services, two VMs | 10/10: tiers, remote + local pull, holds both sides, pruning 3→0 hourlies, quota/readonly, no destroy, `from=` refusal, no source→archive credential, byte-identical restore |
+| `checks.backup` | **this module**, real sanoid/syncoid services, two VMs | 12/12: tiers, remote + local pull, holds both sides, pruning 3→0 hourlies, quota/readonly, no destroy, `from=` refusal, no source→archive credential, byte-identical restore; host keys root-only, re-copied on change, restored byte-identical with mode 600 |
 
 Both run in CI (`vm-tests` job) on every push.
 Not proven by VMs: real data volume, restore time at scale, the real disk.
