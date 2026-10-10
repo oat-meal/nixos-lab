@@ -355,11 +355,14 @@
   ################################
   ## NFS
   ################################
+  # Exported to the workstation only — the one host that mounts it (/mnt/server, rw).
+  # Until 2026-10-09 this was the whole mesh /24 read-write, which included the laptop:
+  # it travels, never mounts /storage, and NFS AUTH_SYS lets a client claim any uid.
+  # root_squash stays. Add a host here only when it gains a mount.
   services.nfs.server = {
     enable = true;
-    exports = let
-    in ''
-      /storage  ${net.wireguard.meshSubnet}(rw,sync,no_subtree_check,root_squash,crossmnt)
+    exports = ''
+      /storage  ${net.wireguard.meshIPs.workstation-nixos}(rw,sync,no_subtree_check,root_squash,crossmnt)
     '';
   };
 
