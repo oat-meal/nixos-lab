@@ -167,15 +167,15 @@ This lets you use stable nixpkgs for the system base while pulling specific pack
 
 ## Secrets
 
-Two layers, matching two different needs:
-
-| | git-crypt (build-time) | sops-nix (runtime) |
+| | `hosts/network.nix` | `secrets/secrets.yaml` (sops-nix) |
 |---|---|---|
-| File | `secrets/network.nix` | `secrets/secrets.yaml` |
 | Contains | IPs, public keys, device IDs | WireGuard private keys |
-| Encrypted by | git-crypt (symmetric key) | age (per-host SSH host keys) |
-| Available when | Nix evaluates the config | System activates at boot |
-| Decrypted to | Working tree (plaintext on disk) | `/run/secrets/` (tmpfs) |
+| Protection | None — plaintext and public on purpose; nothing in it is secret | age, per-host SSH host keys |
+| Available when | Nix evaluates the config (the `net` module argument) | System activates at boot |
+| On disk | The working tree | `/run/secrets/` (tmpfs) |
+
+Until 2026-10-09 the left column was `secrets/network.nix` under git-crypt. It protected
+nothing (the addresses were public elsewhere) and stopped CI from evaluating the flake.
 
 ## The Rebuild Cycle
 

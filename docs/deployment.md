@@ -17,10 +17,10 @@ others. Git runs as `<user>`; only `nixos-rebuild` uses sudo.
 
 1. **Edit** on any host.
 2. **Commit** — required, because Nix flakes only see tracked/committed files
-   and `git push` only sends commits. Use the git-crypt wrapper so encrypted
-   secrets are handled:
+   and `git push` only sends commits. Stage explicit paths, not `-A` — parallel
+   sessions edit this repo too:
    ```sh
-   cd /etc/nixos && nix-shell -p git-crypt --run 'git add -A && git commit -m "describe change"'
+   cd /etc/nixos && git add <paths> && git commit -m "describe change"
    ```
 3. **Deploy to all hosts:**
    ```sh
@@ -41,7 +41,7 @@ others. Git runs as `<user>`; only `nixos-rebuild` uses sudo.
 - **This host only:** `bash /etc/nixos/deploy.sh local` (or no arguments).
 - **Monthly flake update:**
   ```sh
-  cd /etc/nixos && nix flake update && nix-shell -p git-crypt --run 'git add flake.lock && git commit -m "flake: update inputs"' && bash /etc/nixos/deploy.sh all
+  cd /etc/nixos && nix flake update && git add flake.lock && git commit -m "flake: update inputs" && bash /etc/nixos/deploy.sh all
   ```
 
 ## Staying in sync / avoiding drift

@@ -150,7 +150,7 @@
       };
 
       # Lab addresses, public keys, Syncthing IDs — passed to every module as `net`.
-      net = import ./lib/network.nix;
+      net = import ./hosts/network.nix;
 
       # Builder helper for NixOS hosts
       mkSystem = { hostname, hostPath, extraModules ? [], enableHomeManager ? true, enableDesktop ? true }:

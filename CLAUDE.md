@@ -16,7 +16,8 @@ Run `hostname` at conversation start to determine context.
 - **Remote**: `git@github.com:oat-meal/nixos-lab.git` (SSH)
 - **Type**: Nix Flakes with Home Manager
 - **Channel**: nixpkgs-25.11 stable, selective unstable overlay (`pkgs.unstable.<pkg>`)
-- **Secrets**: `secrets/network.nix` encrypted via git-crypt (see Secrets section)
+- **Secrets**: sops-nix only (`secrets/secrets.yaml`); `hosts/network.nix` is plaintext by design (see Secrets section)
+- **CI**: GitHub Actions evaluates all three systems + the ISO and runs the content guard on every push
 
 ## What belongs in this repo (infra vs content)
 
@@ -27,7 +28,7 @@ automatically vs. what would I restore from on-prem backup?*
 - **Belongs here (infrastructure):** all `*.nix`, `flake.nix`, host/module configs, and the
   tool **code** Nix builds (`ai-lab/{quorum,rag,research}/*.py`, `ai-lab/api/server.py`,
   `ai-lab/mcp/.../server.py`, `ai-lab/eliteintel/package.nix`, `ai-lab/comfyui/Containerfile`,
-  `ai-lab/lora-training/` toolkit). No secrets (git-crypt/sops handle those), no personal data.
+  `ai-lab/lora-training/` toolkit). No secrets (sops handles those), no personal data.
 - **Does NOT belong here (content/data → private, on-prem):** ComfyUI workflow JSONs
   (`ai-lab/comfyui/workflows/`), prompts/personas, generated images, model weights, RAG
   corpora, Open WebUI databases, the LoRA dataset, the Obsidian vault. These live on `/storage` (ZFS-snapshotted), service data
@@ -35,10 +36,10 @@ automatically vs. what would I restore from on-prem backup?*
   - `server:/storage/git/lab-content.git` — cards, ComfyUI workflows, prompts (clone: `~/Documents/lab-content`)
   - `server:/storage/git/ai-lab-vault.git` — Obsidian system-docs vault (clone: `~/Documents/ai-lab-vault`)
 
-Enforced by `.gitignore` + a tracked pre-commit hook (`.githooks/pre-commit`). The hook is
-NOT auto-active per clone — enable it once after cloning: `git config core.hooksPath .githooks`
-(see "Unlocking git-crypt after a fresh clone"). Override for a genuine infra file with
-`git commit --no-verify`.
+Enforced by `.gitignore`, a tracked pre-commit hook (`.githooks/pre-commit`), and CI, which
+runs the same hook with `--all` over every tracked file on each push. The local hook is NOT
+auto-active per clone — enable it once: `git config core.hooksPath .githooks`. Override for a
+genuine infra file with `git commit --no-verify` (CI will still flag it).
 
 ## Structure
 
@@ -56,9 +57,9 @@ home/
 ├── <user>/               # User-specific Home Manager config
 └── common/optional/   # Shared HM modules (desktop/, security/, user-packages.nix, theme.nix)
 
+hosts/network.nix      # IPs, public keys, device IDs — plaintext data, passed to modules as `net`
+
 secrets/
-├── network.nix        # IPs, public keys, device IDs (git-crypt, build-time)
-├── network.nix.example # Template with placeholders
 ├── secrets.yaml       # WireGuard private keys (sops-nix, runtime)
 └── init-sops.sh       # Helper to collect and encrypt WireGuard keys
 
@@ -143,16 +144,9 @@ All SSH access is restricted to WireGuard mesh (`wg0`, 10.100.0.0/24). Syncthing
 
 ## Secrets
 
-Two layers:
+One system — **sops-nix**: `secrets/secrets.yaml` holds the WireGuard private keys, encrypted via age and decrypted to `/run/secrets/` at activation. Age keys derive from SSH host keys (`/etc/ssh/ssh_host_ed25519_key`).
 
-- **git-crypt** (build-time): `secrets/network.nix` — IPs, public keys, device IDs. Plaintext in working tree, encrypted in git. Imported by Nix modules at evaluation.
-- **sops-nix** (runtime): `secrets/secrets.yaml` — WireGuard private keys. Encrypted via age, decrypted to `/run/secrets/` at system activation. Age keys derived from SSH host keys (`/etc/ssh/ssh_host_ed25519_key`).
-
-### Committing changes to git-crypt files
-
-```bash
-nix-shell -p git-crypt --run 'git add -A && git commit -m "message"'
-```
+**`hosts/network.nix` is plaintext and public on purpose** (since 2026-10-09; it was git-crypt'd as `secrets/network.nix`): usernames, LAN/mesh IPs, public keys, Syncthing IDs. Modules receive it as the `net` argument — write `net.wireguard.meshIPs.server-nixos`, never a literal `10.100.0.x`. Anything that would be dangerous to publish goes in sops, never here.
 
 ### Editing sops secrets
 
@@ -160,18 +154,12 @@ nix-shell -p git-crypt --run 'git add -A && git commit -m "message"'
 nix-shell -p sops age ssh-to-age --run 'sops secrets/secrets.yaml'
 ```
 
-### Unlocking git-crypt after a fresh clone
-
-```bash
-git-crypt unlock ~/.config/git-crypt/nixos-lab.key
-```
-
-The git-crypt key is synced to all hosts via Syncthing (`~/.config/git-crypt/`). sops-nix uses SSH host keys automatically.
+A fresh clone needs no key to evaluate — CI (`.github/workflows/check.yml`) proves it on every push. sops-nix uses SSH host keys automatically. The old git-crypt key stays in `~/.config/git-crypt/` only to read `network.nix` in history before `cdd0d69`.
 
 ## Troubleshooting
 
 ### Build fails with "access to absolute path forbidden"
-Flake pure evaluation blocks absolute paths. All imports must be relative. Secrets must be tracked in git (git-crypt handles encryption).
+Flake pure evaluation blocks absolute paths. All imports must be relative, and files must be tracked (`git add`) — flakes ignore untracked files.
 
 ### WireGuard handshake not completing
 Check `rp_filter` — Linux uses `max(all, interface)`. Both `net.ipv4.conf.all.rp_filter` and `net.ipv4.conf.wg0.rp_filter` must be `2` (loose). The wireguard.nix module handles this with `lib.mkForce`.

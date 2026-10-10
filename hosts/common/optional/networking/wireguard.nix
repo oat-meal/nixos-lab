@@ -4,7 +4,7 @@
 #   sudo mkdir -p /etc/wireguard
 #   wg genkey | sudo tee /etc/wireguard/private.key | wg pubkey | sudo tee /etc/wireguard/public.key
 #   sudo chmod 600 /etc/wireguard/private.key
-# Then add each host's public key to lib/network.nix and redeploy all hosts.
+# Then add each host's public key to hosts/network.nix and redeploy all hosts.
 
 { config, pkgs, lib, net, ... }:
 

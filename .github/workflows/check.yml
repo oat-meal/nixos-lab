@@ -3,7 +3,7 @@
 # Evaluates, never builds: the ROCm closures are far too heavy for a hosted runner,
 # and evaluation is what catches the failures that have actually happened here — a
 # flake output that never built (the installer ISO, until 1347087) and module errors.
-# Possible only since lib/network.nix left git-crypt (cdd0d69); before that no clean
+# Possible only since hosts/network.nix left git-crypt (cdd0d69); before that no clean
 # checkout could evaluate anything.
 #
 # Actions are pinned to commit SHAs, not tags: this repo deploys as root, and a tag

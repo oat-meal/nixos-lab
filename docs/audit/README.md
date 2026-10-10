@@ -22,7 +22,7 @@ The canonical procedure lives in [../deployment.md](../deployment.md) §"Monthly
 kept there so there is one copy to keep correct:
 
 ```bash
-cd /etc/nixos && nix flake update && nix-shell -p git-crypt --run 'git add flake.lock && git commit -m "flake: update inputs"' && bash /etc/nixos/deploy.sh all
+cd /etc/nixos && nix flake update && git add flake.lock && git commit -m "flake: update inputs" && bash /etc/nixos/deploy.sh all
 ```
 
 `flake.lock` must be **committed**, not just updated: flakes only see tracked files, so an

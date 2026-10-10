@@ -3,7 +3,7 @@
 #
 # After first deployment, get device IDs with:
 #   syncthing cli show system | grep myID
-# Then update lib/network.nix and redeploy.
+# Then update hosts/network.nix and redeploy.
 
 { config, lib, net, ... }:
 

@@ -27,7 +27,7 @@ routes to the same gateway**. That makes wg0 source-address selection ambiguous 
 asymmetric routing. `mt7925e` is now blacklisted (`boot.blacklistedKernelModules`) rather than
 left as an unmanaged interface that could be re-enabled by accident.
 
-The wg0 endpoint (`secrets/network.nix` → `lanIPs.server-nixos`) tracks the **wired** address.
+The wg0 endpoint (`hosts/network.nix` → `lanIPs.server-nixos`) tracks the **wired** address.
 It previously pointed at the WiFi address, and the earlier `.50` static was a hand-made NM
 profile that did not survive a reboot — NM fell back to an auto-generated DHCP profile and the
 mesh then only converged in whichever direction the server happened to initiate. The profile is

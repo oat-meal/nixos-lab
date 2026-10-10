@@ -87,10 +87,9 @@ nixos-lab/
 ├── flake.lock                       # Pinned inputs
 ├── deploy.sh                        # Multi-host deploy script
 │
+├── .github/workflows/check.yml      # CI: evaluate all systems + ISO, content guard
 ├── .sops.yaml                       # sops-nix age key config
 ├── secrets/
-│   ├── network.nix                  # IPs, public keys, device IDs (git-crypt encrypted)
-│   ├── network.nix.example          # Template with placeholders
 │   ├── secrets.yaml                 # Runtime secrets: WireGuard private keys (sops encrypted)
 │   └── init-sops.sh                 # Helper to collect and encrypt WireGuard keys
 │
@@ -101,6 +100,7 @@ nixos-lab/
 │   └── claude-config/               # CLAUDE.md baked into the ISO
 │
 ├── hosts/
+│   ├── network.nix                  # IPs, public keys, device IDs — plaintext data, the `net` module arg
 │   ├── common/
 │   │   ├── core/                    # Required on ALL hosts
 │   │   │   ├── boot.nix             # systemd-boot
@@ -161,46 +161,22 @@ nixos-lab/
 
 ## Secrets
 
-Two layers of secrets management:
+One system, **sops-nix**: `secrets/secrets.yaml` holds the WireGuard private keys, encrypted in git via age and decrypted to `/run/secrets/` at activation. Age keys derive from each host's SSH host key, so there is no key to distribute.
 
-- **git-crypt** (build-time): `secrets/network.nix` — IPs, public keys, Syncthing device IDs. Encrypted in git, plaintext in the working tree. Used by Nix at evaluation time.
-- **sops-nix** (runtime): `secrets/secrets.yaml` — WireGuard private keys. Encrypted in git via age, decrypted to `/run/secrets/` at system activation. Age keys are derived from each host's SSH host key.
+`hosts/network.nix` is **deliberately plaintext**: usernames, LAN and mesh addresses, public keys, Syncthing device IDs. None of it is secret. Modules receive it as the `net` argument (`net.wireguard.meshIPs.server-nixos`), so addresses live in one place. Until 2026-10-09 it was git-crypt-encrypted as `secrets/network.nix`; that blocked CI and protected nothing.
 
-### For repo contributors (using your own lab)
+### Using this flake for your own lab
 
-No git-crypt or sops key needed. Copy the templates and fill in your own values:
-
-```bash
-cp secrets/network.nix.example secrets/network.nix
-# Edit secrets/network.nix with your IPs, public keys, and device IDs
-```
-
-For sops secrets, generate your own `.sops.yaml` with your hosts' age keys:
+Replace `hosts/network.nix` with your own hosts' values. For sops, generate your own `.sops.yaml` from your hosts' age keys:
 
 ```bash
 nix-shell -p ssh-to-age --run 'cat /etc/ssh/ssh_host_ed25519_key.pub | ssh-to-age'
 ```
 
-Then run `bash secrets/init-sops.sh` to collect and encrypt WireGuard private keys.
-
-### For existing lab hosts
-
-The git-crypt symmetric key is synced via Syncthing to `~/.config/git-crypt/nixos-lab.key` on all hosts. sops-nix uses SSH host keys automatically — no extra key distribution needed.
+Then run `bash secrets/init-sops.sh` to collect and encrypt the WireGuard private keys. Edit them later with:
 
 ```bash
-# Unlock git-crypt after a fresh clone
-git-crypt unlock ~/.config/git-crypt/nixos-lab.key
-
-# Edit sops secrets
 nix-shell -p sops age ssh-to-age --run 'sops secrets/secrets.yaml'
-```
-
-### Committing changes to encrypted files
-
-git-crypt must be in PATH when staging encrypted files:
-
-```bash
-nix-shell -p git-crypt --run 'git add -A && git commit -m "message"'
 ```
 
 ## System Management
@@ -215,11 +191,11 @@ bash /etc/nixos/deploy.sh all
 # Deploy to a specific remote host
 bash /etc/nixos/deploy.sh server-nixos
 
-# Preview changes
-sudo nixos-rebuild dry-activate --flake /etc/nixos#$(hostname)
+# Validate without switching (no sudo)
+nixos-rebuild build --flake /etc/nixos#$(hostname)
 
-# Update flake inputs
-sudo nix flake update /etc/nixos
+# Update flake inputs — never under sudo (root-owned files in /etc/nixos break git)
+nix flake update --flake /etc/nixos
 
 # Garbage collect
 sudo nix-collect-garbage --delete-older-than 30d
@@ -229,17 +205,18 @@ sudo nix-collect-garbage --delete-older-than 30d
 
 - **ZFS on LUKS** (not ZFS native encryption): enables FIDO2 unlock via systemd-cryptenroll, full-pool encryption including metadata
 - **Single flake, multi-host**: shared modules reduce duplication; host-specific config via imports and `mkForce` overrides
-- **Stable + unstable overlay**: `nixpkgs-25.11` base with `pkgs.unstable.<pkg>` for select packages
+- **Stable + unstable overlay**: `nixos-26.05` base with `pkgs.unstable.<pkg>` for select packages
 - **Filesystem-agnostic modules**: device paths and UUIDs live exclusively in `hardware-configuration.nix` (generated per-host by the installer)
 - **MangoWM compositor + Noctalia shell**: Wayland desktop on all desktop hosts (greetd + tuigreet login, defaults to the Mango session)
 - **Catppuccin Macchiato**: system-wide theming via Home Manager
 - **WireGuard-only SSH**: `openFirewall = false` on SSH/Mosh services, port 22 opened only on `wg0` interface — no LAN SSH exposure
-- **Two-layer secrets**: git-crypt for build-time values (IPs, public keys), sops-nix for runtime secrets (private keys) — different trust boundaries, appropriate tooling for each
+- **One secrets system**: sops-nix for private keys; addresses and public keys are plaintext in `hosts/network.nix` because they are not secret
+- **CI evaluates, does not build**: every push evaluates all three systems and the installer ISO and runs the content guard; ROCm closures are too heavy for hosted runners
 - **Inactive modules kept in tree**: some optional modules (e.g. `displaylink.nix`, `yubikey/`) are not imported by any host but kept for future use. They have zero impact on builds — add the import to a host's `default.nix` to activate
 
 ## Networking
 
-IPs and keys are in `secrets/network.nix`. The network topology:
+IPs and keys are in `hosts/network.nix`. The network topology:
 
 - **WireGuard mesh** (`wg0`): encrypted full-mesh between all hosts. All SSH and NFS access is restricted to this mesh.
 
@@ -249,17 +226,18 @@ IPs and keys are in `secrets/network.nix`. The network topology:
 | `server-nixos` | 10.100.0.2 |
 | `laptop-nixos` | 10.100.0.3 |
 - **NordVPN** (`wgnord`): outbound VPN via wgnord on workstation-nixos and laptop-nixos
-- **Syncthing**: file sync across all hosts (LAN-only, no relays). Syncs `~/.claude/` and `~/.config/git-crypt/`
+- **Syncthing**: file sync across all hosts (LAN-only, no relays). Syncs `~/.claude/`; the server is receive-only
 - **NFS**: server exports `/storage` to WireGuard subnet (encrypted in transit)
 
 ## Security
 
 - LUKS2 with argon2id key derivation
 - YubiKey FIDO2 for disk unlock (optional second factor)
-- PAM U2F for sudo/login
+- sudo requires the password (60-min cache); NOPASSWD only for three read-only `lab-*` wrappers; listed services restart via polkit
+- Server automation reaches other hosts as `lab-monitor` (journal access only), never as the user
 - SSH restricted to WireGuard mesh: `openFirewall = false`, `ListenAddress` bound to each host's WireGuard IP, fail2ban on all hosts
 - Firewall enabled on all hosts; admin services (SSH, Mosh, Ollama, AdGuard UI) restricted to `wg0` interface
-- git-crypt for build-time secrets (network config), sops-nix for runtime secrets (private keys)
+- sops-nix for private keys; no other encrypted material in the repo
 - Kernel hardening with loose rp_filter for WireGuard compatibility
 - NordVPN via WireGuard (wgnord)
 
