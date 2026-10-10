@@ -87,8 +87,9 @@
     # session down on the first keypress after the only monitor sleeps.
     # 2026-10-09: the base is now 26.05, which DOES package wlroots_0_20 (0.20.0),
     # so following stable nixpkgs is possible. Not switched here: it changes how the
-    # desktop is built, and belongs with the mango config migration (upstream renamed
-    # 12 config keywords; the input is held back until that lands).
+    # desktop is built. 2026-10-10: the config migration to upstream's renamed
+    # keywords (snake_case: window_rule, gap_inner_horizontal, ...) landed with the
+    # input bump on branch mango-migration; the follows is still unstable.
     mango = {
       url = "github:mangowm/mango";
       inputs.nixpkgs.follows = "nixpkgs-unstable";

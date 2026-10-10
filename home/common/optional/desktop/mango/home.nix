@@ -139,7 +139,7 @@ in
       # at this PPI (raised 2026-08-16). 2.0 is also an INTEGER scale, so it avoids the
       # fractional-scaling blur that 1.5 inflicts on Xwayland clients.
       # Anchored to ^eDP-1$ so it's a no-op on hosts without that output.
-      monitorrule=name:^eDP-1$,scale:2.0
+      monitor_rule=name:^eDP-1$,scale:2.0
 
       # Workstation LG UltraGear is 3840x2160 on a ~48" panel (~92 PPI); scale 1.0 →
       # logical 3840x2160, i.e. 1:1 with the panel.
@@ -162,17 +162,17 @@ in
       # Streaming still downscales; if the softer stream ever becomes the bigger
       # annoyance, fix it with a Sunshine-specific mode rather than by shaping the whole
       # desktop around the capture. Anchored to ^DP-1$.
-      monitorrule=name:^DP-1$,scale:1.0
+      monitor_rule=name:^DP-1$,scale:1.0
 
       # ---------------- Appearance ----------------
-      gappih=8
-      gappiv=8
-      gappoh=8
-      gappov=8
-      borderpx=2
-      rootcolor=0x24273aff
-      bordercolor=0x494d64ff
-      focuscolor=0xc6a0f6ff
+      gap_inner_horizontal=8
+      gap_inner_vertical=8
+      gap_outer_horizontal=8
+      gap_outer_vertical=8
+      border_px=2
+      root_color=0x24273aff
+      border_color=0x494d64ff
+      focus_color=0xc6a0f6ff
       border_radius=6
 
       # ---------------- Animations ----------------
@@ -186,8 +186,8 @@ in
       repeat_delay=300
 
       # ---------------- Pointer / touchpad ----------------
-      sloppyfocus=1
-      warpcursor=0
+      sloppy_focus=1
+      warp_cursor=0
       tap_to_click=1
       trackpad_natural_scrolling=1
       # Renamed upstream 2026-07/08: the bare disable_while_typing is now only
@@ -196,15 +196,15 @@ in
       trackpad_disable_while_typing=1
 
       # ---------------- Default layout per tag: scroller ----------------
-      tagrule=id:1,layout_name:scroller
-      tagrule=id:2,layout_name:scroller
-      tagrule=id:3,layout_name:scroller
-      tagrule=id:4,layout_name:scroller
-      tagrule=id:5,layout_name:scroller
-      tagrule=id:6,layout_name:scroller
-      tagrule=id:7,layout_name:scroller
-      tagrule=id:8,layout_name:scroller
-      tagrule=id:9,layout_name:scroller
+      tag_rule=id:1,layout_name:scroller
+      tag_rule=id:2,layout_name:scroller
+      tag_rule=id:3,layout_name:scroller
+      tag_rule=id:4,layout_name:scroller
+      tag_rule=id:5,layout_name:scroller
+      tag_rule=id:6,layout_name:scroller
+      tag_rule=id:7,layout_name:scroller
+      tag_rule=id:8,layout_name:scroller
+      tag_rule=id:9,layout_name:scroller
 
       # ---------------- Launchers ----------------
       bind=SUPER,d,spawn,${nc} msg panel-toggle launcher
@@ -341,26 +341,26 @@ in
 
       # ---------------- Window rules (float dialogs / launchers / PiP) ----------------
       # Steam: the main window tiles like any other client. Only its transient
-      # popups float — a blanket appid:steam float also caught the main window,
+      # popups float — a blanket app_id:steam float also caught the main window,
       # which then sat on top of the layout instead of joining it.
       # Startup window (shows sign-in / update progress before the main window
       # exists, ~4.8s-6.5s in). Distinct title from the main window's "Steam",
       # so floating it does not disturb the tiled layout on launch.
-      windowrule=isfloating:1,appid:steam,title:Sign in to Steam
-      windowrule=isfloating:1,appid:steam,title:Friends List
-      windowrule=isfloating:1,appid:steam,title:Steam Settings
-      windowrule=isfloating:1,appid:steam,title:Special Offers
-      windowrule=isfloating:1,appid:lutris
-      windowrule=isfloating:1,appid:heroic
-      windowrule=isfloating:1,appid:pavucontrol
-      windowrule=isfloating:1,appid:nm-connection-editor
-      windowrule=isfloating:1,appid:blueman-manager
+      window_rule=is_floating:1,app_id:steam,title:Sign in to Steam
+      window_rule=is_floating:1,app_id:steam,title:Friends List
+      window_rule=is_floating:1,app_id:steam,title:Steam Settings
+      window_rule=is_floating:1,app_id:steam,title:Special Offers
+      window_rule=is_floating:1,app_id:lutris
+      window_rule=is_floating:1,app_id:heroic
+      window_rule=is_floating:1,app_id:pavucontrol
+      window_rule=is_floating:1,app_id:nm-connection-editor
+      window_rule=is_floating:1,app_id:blueman-manager
       # Browser Picture-in-Picture, parked in the upper-left corner so it can
       # overlay a fullscreen game without landing on the middle of the screen.
-      # offsetx/offsety are PERCENTAGES FROM SCREEN CENTRE, not pixels, and
+      # offset_x/offset_y are PERCENTAGES FROM SCREEN CENTRE, not pixels, and
       # -100/+100 is the edge including the outer gap -- so -100,-100 is flush
       # upper-left. Measured 2026-09-11 on DP-1 when it was 3072x1728 logical
-      # (gappo 8): a probe window with this rule landed at x=8, y=42, i.e. exactly
+      # (gap_outer_* 8): a probe window with this rule landed at x=8, y=42, i.e. exactly
       # the outer gap on the left and clear of the Noctalia bar on top.
       # ⚠️ DP-1 became 3840x2160 logical on 2026-10-07 (scale 1.25 -> 1.0). The
       # offsets are PERCENTAGES from centre, so the rule still parks flush
@@ -375,9 +375,9 @@ in
       # purpose: Firefox and its forks all use this title, and the appid does
       # not (zen-beta here).
       # Size is left to the client. This build DOES honour width/height in a
-      # windowrule -- verified on the same probe, which came up 800x450 -- so
+      # window_rule -- verified on the same probe, which came up 800x450 -- so
       # add them here if the default PiP size ever wants pinning.
-      windowrule=isfloating:1,title:^Picture-in-Picture$,offsetx:-100,offsety:-100
+      window_rule=is_floating:1,title:^Picture-in-Picture$,offset_x:-100,offset_y:-100
       # Aurora, launched into a game's Proton prefix via PROTON_REMOTE_DEBUG_CMD.
       # Tiled, the scroller layout forces its Xwayland window to the tile
       # geometry (2721x1678) after it maps, and its input and its rendering then
@@ -396,7 +396,7 @@ in
       # Title-scoped rather than appid-scoped on purpose: the appid is
       # steam_app_<gameid> and differs per game, but the window is always
       # "Aurora", so this holds for whatever game it is attached to.
-      windowrule=isfloating:1,title:^Aurora$
+      window_rule=is_floating:1,title:^Aurora$
     '';
   };
 }
