@@ -1,9 +1,12 @@
 # Per-peer trust zones on wg0. Imported by wireguard.nix; inert until a zone is declared.
 #
+# NONE IS DECLARED, BY DECISION (oat, 2026-10-10): the laptop is a second place to do the
+# same work, so every mesh device reaches every wg0 service. Kept for if that changes.
+#
 # Every port opened with networking.firewall.interfaces."wg0" is open to EVERY mesh peer.
-# The peers are not equally trusted: the laptop travels, so a stolen or compromised laptop
-# would reach Ollama, ChromaDB, NFS and the rest exactly as the workstation does. A zone
-# narrows what one peer may OPEN on this host:
+# The trade-off accepted with that: a stolen or compromised laptop reaches Ollama, ChromaDB,
+# NFS and the rest exactly as the workstation does. A zone narrows what one peer may OPEN
+# on this host:
 #
 #   lab.meshZones.laptop-nixos = { tcp = [ 22 2586 ]; udp = [ "60000:60010" ]; };
 #

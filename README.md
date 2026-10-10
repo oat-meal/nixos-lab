@@ -249,7 +249,7 @@ IPs and keys are in `hosts/network.nix`. The network topology:
 - Server automation reaches other hosts as `lab-monitor` (journal access only), never as the user
 - SSH restricted to WireGuard mesh: `openFirewall = false`, `ListenAddress` bound to each host's WireGuard IP, fail2ban on all hosts
 - Firewall enabled on all hosts; admin services (SSH, Mosh, Ollama, AdGuard UI) restricted to `wg0` interface
-- Per-peer trust zones on `wg0` (`lab.meshZones`, `networking/mesh-zones.nix`): narrow what one mesh peer may open on a host. Built and tested; **no zone declared yet**, so every peer still reaches every `wg0` port
+- `wg0` is one trust zone **by decision** (2026-10-10): every mesh device, the laptop included, reaches every `wg0` service, because the laptop is a second place to do the same work. `lab.meshZones` (`networking/mesh-zones.nix`) can narrow one peer if that changes; it is tested and declares nothing
 - sops-nix for private keys; no other encrypted material in the repo
 - Kernel hardening with loose rp_filter for WireGuard compatibility
 - NordVPN via WireGuard (wgnord)
