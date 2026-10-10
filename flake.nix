@@ -103,7 +103,7 @@
       system = "x86_64-linux";
 
       # Shared overlay for unstable packages
-      unstableOverlay = final: prev: {
+      unstableOverlay = _final: prev: {
         unstable = (import nixpkgs-unstable {
           inherit system;
           config = prev.config;
@@ -183,7 +183,7 @@
             # Overlays
             { nixpkgs.overlays = [
               unstableOverlay
-              (final: prev: { zen-browser = zen-browser.packages.${system}.default; })
+              (_final: _prev: { zen-browser = zen-browser.packages.${system}.default; })
             ]; }
           ]
           # Desktop compositor (MangoWM) is imported per-host via hosts/*/default.nix

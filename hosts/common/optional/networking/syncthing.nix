@@ -34,7 +34,7 @@ in
     overrideFolders = true;
 
     settings = {
-      devices = lib.mapAttrs (name: id: {
+      devices = lib.mapAttrs (_name: id: {
         inherit id;
       }) otherHosts;
 
