@@ -17,7 +17,9 @@
 # Pinned by digest after verification (== :base-rocm72-pt212-20260518) so the base
 # can't shift under us. Resolve/refresh with:
 #   skopeo inspect docker://docker.io/yanwk/comfyui-boot:base-rocm72-pt212-20260518
-FROM docker.io/yanwk/comfyui-boot:base-rocm72-pt212-20260518
+# Tag kept for readability; the digest is what is used (pinned 2026-10-10 to the index the
+# tag resolved to then — the base the current image was built from).
+FROM docker.io/yanwk/comfyui-boot:base-rocm72-pt212-20260518@sha256:8574a031dea0d53b624d932580eb2ed985cf032c4985e2f0395513a858539348
 
 # ComfyUI CORE deps. The code lives in the volume, but its Python requirements must be
 # in the image's site-packages. Clone shallow only to grab requirements.txt, install,

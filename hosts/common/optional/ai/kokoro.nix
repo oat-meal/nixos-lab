@@ -13,7 +13,9 @@
   systemd.services.podman-kokoro.serviceConfig.TimeoutStartSec = lib.mkForce "30min";
 
   virtualisation.oci-containers.containers.kokoro = {
-    image = "ghcr.io/remsky/kokoro-fastapi-cpu:v0.5.0";
+    # v0.5.0, pinned by digest (2026-10-10): a tag can be moved to different content; a
+    # digest cannot. This is the index the tag resolved to then — already the running image.
+    image = "ghcr.io/remsky/kokoro-fastapi-cpu@sha256:bcf38f9bf7f040b0465dd4352eb0fa0b2db42d4bd91eba16acef0b40e5c57905";
     ports = [ "${net.wireguard.meshIPs.server-nixos}:8880:8880" ]; # wg0 only
   };
 
