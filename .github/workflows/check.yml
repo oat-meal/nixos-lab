@@ -52,3 +52,50 @@ jobs:
           done
           echo "evaluated: $ok/$total"
           [ "$ok" -eq "$total" ]
+
+  vm-tests:
+    # RUNS (not just evaluates) every checks.* VM test in the flake, discovered at run
+    # time, so a new test needs no workflow edit. GitHub's Linux runners expose /dev/kvm;
+    # the udev rule makes it usable by Nix's build users.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Enable KVM for the Nix build users
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+        with:
+          extra_nix_config: |
+            system-features = nixos-test benchmark big-parallel kvm
+      - name: Run every VM test
+        run: |
+          tests=$(nix eval --json .#checks.x86_64-linux --apply builtins.attrNames | jq -r '.[]')
+          ok=0; total=0
+          for t in $tests; do
+            total=$((total + 1))
+            if nix build -L ".#checks.x86_64-linux.$t"; then ok=$((ok + 1)); echo "PASS  $t"; else echo "FAIL  $t"; fi
+          done
+          echo "vm tests: $ok/$total"
+          [ "$total" -gt 0 ] && [ "$ok" -eq "$total" ]
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0   # gitleaks scans the full history, not just the tip
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+      - name: gitleaks — BLOCKING (full history was clean on 2026-10-09)
+        run: nix run nixpkgs#gitleaks -- git --redact --no-banner -v .
+      - name: statix — report only (119 findings at the 2026-10-10 baseline)
+        continue-on-error: true
+        run: |
+          n=$( (nix run nixpkgs#statix -- check . -o errfmt || true) | wc -l )
+          echo "statix findings: $n"
+          [ "$n" -eq 0 ]
+      - name: deadnix — report only (6 at baseline)
+        continue-on-error: true
+        run: nix run nixpkgs#deadnix -- --fail --no-lambda-pattern-names .
