@@ -209,6 +209,14 @@
 
     in {
       ############################################################
+      ## CHECKS — VM tests. CI evaluates them (--no-build); run them on a KVM host:
+      ##   nix build .#checks.x86_64-linux.recovery-drill -L
+      ############################################################
+
+      checks.${system}.recovery-drill =
+        import ./tests/recovery-drill.nix { pkgs = nixpkgs.legacyPackages.${system}; };
+
+      ############################################################
       ## INSTALLER ISO
       ############################################################
 
