@@ -1,0 +1,8 @@
+# gitleaks: the default rules, plus ONE exemption — test-only key material that exists
+# solely for the VM tests (tests/fixtures/README.md). Nothing outside that path is exempt.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Test-only keys for VM tests; used by no real host"
+paths = ['''^tests/fixtures/''']

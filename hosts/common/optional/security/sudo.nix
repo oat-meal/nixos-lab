@@ -108,6 +108,12 @@ in
     # one grants no privilege. Explicit list rather than "any unit" because some units
     # are reachable only to escalate or to take the host down (rescue/emergency,
     # templated instances whose argument reaches ExecStart).
+    # The rule below is inert unless polkit runs. On the hosts it was only ever on as a
+    # side effect (NetworkManager/ModemManager enable it; desktop/base.nix sets it), so a
+    # host dropping NetworkManager would have silently lost every `systemctl restart`
+    # grant. Found by the security-policy VM test, which has no NetworkManager.
+    security.polkit.enable = true;
+
     security.polkit.extraConfig = ''
       polkit.addRule(function (action, subject) {
         var units = ${builtins.toJSON config.lab.restartableUnits};

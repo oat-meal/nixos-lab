@@ -213,8 +213,10 @@
       ##   nix build .#checks.x86_64-linux.recovery-drill -L
       ############################################################
 
-      checks.${system}.recovery-drill =
-        import ./tests/recovery-drill.nix { pkgs = nixpkgs.legacyPackages.${system}; };
+      checks.${system} = {
+        recovery-drill = import ./tests/recovery-drill.nix { pkgs = nixpkgs.legacyPackages.${system}; };
+        security-policy = import ./tests/security-policy.nix { pkgs = nixpkgs.legacyPackages.${system}; };
+      };
 
       ############################################################
       ## INSTALLER ISO
