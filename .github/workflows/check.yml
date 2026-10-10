@@ -96,6 +96,5 @@ jobs:
           n=$( (nix run nixpkgs#statix -- check . -o errfmt || true) | wc -l )
           echo "statix findings: $n"
           [ "$n" -eq 0 ]
-      - name: deadnix — report only (6 at baseline)
-        continue-on-error: true
+      - name: deadnix — BLOCKING (cleaned to 0 on 2026-10-10, ea813e0)
         run: nix run nixpkgs#deadnix -- --fail --no-lambda-pattern-names .
