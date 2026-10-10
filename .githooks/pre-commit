@@ -7,8 +7,18 @@
 # This hook blocks staged files that look like content, by extension or by path.
 # Enable per clone with:  git config core.hooksPath .githooks
 # Intentional override (rare, think twice):  git commit --no-verify
+#
+# `--all` checks every tracked file instead of the staged ones. CI runs it that way
+# on each push, because the hook is opt-in per clone and --no-verify skips it — the
+# local hook is a convenience, the CI run is the enforcement.
 
 set -euo pipefail
+
+if [ "${1:-}" = "--all" ]; then
+  list() { git ls-files; }
+else
+  list() { git diff --cached --name-only --diff-filter=AM; }
+fi
 
 # Content file extensions that should never be in this repo.
 ext_re='\.(png|jpe?g|webp|gif|bmp|tiff?|gguf|safetensors|ckpt|pt|pth|bin|onnx|mp4|mov|wav|mp3)$'
@@ -22,7 +32,7 @@ while IFS= read -r f; do
     blocked="$blocked  $f
 "
   fi
-done < <(git diff --cached --name-only --diff-filter=AM)
+done < <(list)
 
 if [ -n "$blocked" ]; then
   cat >&2 <<EOF
