@@ -9,10 +9,10 @@
 #
 # Imported by every host.
 
-{ pkgs, ... }:
+{ pkgs, net, ... }:
 
 let
-  ntfy = "http://10.100.0.2:2586/lab-alerts";
+  ntfy = "http://${net.wireguard.meshIPs.server-nixos}:2586/lab-alerts";
   check = pkgs.writeShellScript "post-rebuild-health-check" ''
     export PATH=/run/current-system/sw/bin:$PATH
     failed=$(systemctl --failed --no-legend --no-pager --plain | awk '{print $1}' | tr '\n' ' ')

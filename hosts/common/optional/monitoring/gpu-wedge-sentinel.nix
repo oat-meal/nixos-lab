@@ -34,14 +34,14 @@
 # symptom (frozen desktop) is already impossible to miss locally; the alert adds the
 # diagnosis, not the discovery.
 
-{ pkgs, ... }:
+{ pkgs, net, ... }:
 
 let
   sentinel = pkgs.writeShellScriptBin "gpu-wedge-sentinel" ''
     export PATH=/run/current-system/sw/bin:$PATH
     set -u
 
-    NTFY_URL="''${NTFY_URL:-http://10.100.0.2:2586/lab-alerts}"
+    NTFY_URL="''${NTFY_URL:-http://${net.wireguard.meshIPs.server-nixos}:2586/lab-alerts}"
 
     # Locate the discrete GPU by picking the DRM card with the most VRAM. Deliberately
     # not hardcoded to card1: the card numbering is not stable across kernels, and this

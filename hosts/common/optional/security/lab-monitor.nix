@@ -12,11 +12,10 @@
 # run is unprivileged: systemctl --failed/is-active, df, zpool/zfs list, journalctl.
 # Imported by the hosts the server probes — workstation and laptop, not the server.
 
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, net, ... }:
 
 let
-  secrets = import ../../../../secrets/network.nix;
-  serverIP = secrets.wireguard.meshIPs.server-nixos;
+  serverIP = net.wireguard.meshIPs.server-nixos;
 in
 {
   users.groups.lab-monitor = { };
@@ -29,7 +28,7 @@ in
     createHome = true;
     shell = pkgs.bashInteractive;
     openssh.authorizedKeys.keys = [
-      ''restrict,from="${serverIP}" ${secrets.monitorKey}''
+      ''restrict,from="${serverIP}" ${net.monitorKey}''
     ];
   };
 }

@@ -14,7 +14,7 @@
 # The check is RELEVANCE: ask for a rare binomial, require it to appear in the
 # results. A `200 OK` over content nobody inspected is not a verdict.
 
-{ pkgs, ... }:
+{ pkgs, net, ... }:
 
 let
   sentinel = pkgs.writeShellScriptBin "search-sentinel" ''
@@ -40,7 +40,7 @@ in
       DynamicUser = true;          # needs no state, no keys, no filesystem
       TimeoutStartSec = "300";      # four engines x 45 s, with headroom
       Environment = [
-        "SEARCH_URL=http://10.100.0.2:8888/search"
+        "SEARCH_URL=http://${net.wireguard.meshIPs.server-nixos}:8888/search"
         # Quorum, not unanimity. `wikipedia` returned 2 results on one run and 0
         # on the next, minutes apart, for the same query — its engine matches
         # near-exact article titles and it rate-limits. Requiring all four would
@@ -48,7 +48,7 @@ in
         # while providing none. An engine returning IRRELEVANT results still
         # fails the run on its own, at any quorum — see the script.
         "SEARCH_MIN_ENGINES=2"
-        "NTFY_URL=http://10.100.0.2:2586/lab-alerts"
+        "NTFY_URL=http://${net.wireguard.meshIPs.server-nixos}:2586/lab-alerts"
       ];
       ExecStart = "${sentinel}/bin/search-sentinel";
     };

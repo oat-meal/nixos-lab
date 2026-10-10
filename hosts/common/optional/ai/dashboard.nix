@@ -3,11 +3,11 @@
 # for up/down status. wg0-only: bound behind the firewall like the other lab services
 # (homepage listens on 0.0.0.0:8085, but the port is opened ONLY on wg0).
 
-{ ... }:
+{ net, ... }:
 
 let
-  host = "10.100.0.2"; # server mesh IP (wg0)
-  wsHost = "10.100.0.1"; # workstation mesh IP (wg0) — the gfx1201 ComfyUI render node
+  host = "${net.wireguard.meshIPs.server-nixos}"; # server mesh IP (wg0)
+  wsHost = "${net.wireguard.meshIPs.workstation-nixos}"; # workstation mesh IP (wg0) — the gfx1201 ComfyUI render node
   port = 8085; # 8085 free; in use: 8080 OWUI, 8091 lab-api, 8188 ComfyUI, 8888 SearXNG
   url = p: "http://${host}:${toString p}";
   wsUrl = p: "http://${wsHost}:${toString p}";

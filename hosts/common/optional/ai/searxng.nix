@@ -13,7 +13,7 @@
 # parameters, get correct results every time. So there is nothing to tune. The
 # engines that work are the ones that expect robots — documented APIs.
 
-{ pkgs, ... }:
+{ pkgs, net, ... }:
 
 {
   services.searx = {
@@ -47,12 +47,12 @@
     environmentFile = "/var/lib/searx-secret/secret.env";
     configureUwsgi = true;
     uwsgiConfig = {
-      http = "10.100.0.2:8888"; # wg0
+      http = "${net.wireguard.meshIPs.server-nixos}:8888"; # wg0
       disable-logging = true;
     };
     settings = {
       server.secret_key = "$SEARX_SECRET_KEY"; # substituted from environmentFile
-      server.bind_address = "10.100.0.2";
+      server.bind_address = "${net.wireguard.meshIPs.server-nixos}";
       server.port = 8888;
       general.instance_name = "lab-search";
       # JSON enabled for programmatic use by the research tool.

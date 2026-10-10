@@ -3,7 +3,7 @@
 # them. wg0-only, unprivileged (DynamicUser). The host-health tools stay in the
 # Claude Code MCP — they need system privileges, these three are just network calls.
 
-{ pkgs, ... }:
+{ pkgs, net, ... }:
 
 let
   pyEnv = pkgs.python3.withPackages (ps: with ps; [ fastapi uvicorn ]);
@@ -24,7 +24,7 @@ in
     };
     serviceConfig = {
       DynamicUser = true;
-      ExecStart = "${pyEnv}/bin/python -m uvicorn server:app --host 10.100.0.2 --port 8091 --app-dir ${apiDir}";
+      ExecStart = "${pyEnv}/bin/python -m uvicorn server:app --host ${net.wireguard.meshIPs.server-nixos} --port 8091 --app-dir ${apiDir}";
       Restart = "on-failure";
       RestartSec = 5;
     };

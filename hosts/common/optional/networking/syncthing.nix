@@ -5,12 +5,11 @@
 #   syncthing cli show system | grep myID
 # Then update secrets/network.nix and redeploy.
 
-{ config, lib, ... }:
+{ config, lib, net, ... }:
 
 let
-  secrets = import ../../../../secrets/network.nix;
   hostname = config.networking.hostName;
-  devices = secrets.syncthing;
+  devices = net.syncthing;
 
   # All hosts except this one
   otherHosts = lib.filterAttrs (name: _: name != hostname) devices;
@@ -25,10 +24,10 @@ in
 {
   services.syncthing = {
     enable = true;
-    user = secrets.user;
+    user = net.user;
     group = "users";
-    dataDir = "/home/${secrets.user}";
-    configDir = "/home/${secrets.user}/.config/syncthing";
+    dataDir = "/home/${net.user}";
+    configDir = "/home/${net.user}/.config/syncthing";
     openDefaultPorts = true;
 
     overrideDevices = true;
@@ -41,7 +40,7 @@ in
 
       folders = {
         "claude-context" = {
-          path = "/home/${secrets.user}/.claude";
+          path = "/home/${net.user}/.claude";
           type = folderType;
           devices = lib.attrNames otherHosts;
           versioning = {
@@ -51,7 +50,7 @@ in
           ignorePerms = false;
         };
         "git-crypt-keys" = {
-          path = "/home/${secrets.user}/.config/git-crypt";
+          path = "/home/${net.user}/.config/git-crypt";
           type = folderType;
           devices = lib.attrNames otherHosts;
           ignorePerms = false;

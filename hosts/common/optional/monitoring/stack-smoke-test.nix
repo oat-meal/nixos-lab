@@ -6,7 +6,7 @@
 # ollama-rocm or the RDNA4 ComfyUI image) before you hit it. Imported by the
 # workstation (it can reach Ollama over wg0 + ComfyUI on loopback).
 
-{ pkgs, ... }:
+{ pkgs, net, ... }:
 
 let
   smoke = pkgs.writeShellScriptBin "stack-smoke-test" ''
@@ -33,10 +33,10 @@ in
       User = "oat";
       TimeoutStartSec = "300";
       Environment = [
-        "OLLAMA_HOST_URL=http://10.100.0.2:11434"
+        "OLLAMA_HOST_URL=http://${net.wireguard.meshIPs.server-nixos}:11434"
         "COMFY_URL=http://127.0.0.1:8188"
         "SMOKE_MODEL=qwen2.5:7b"
-        "NTFY_URL=http://10.100.0.2:2586/lab-alerts"
+        "NTFY_URL=http://${net.wireguard.meshIPs.server-nixos}:2586/lab-alerts"
       ];
       ExecStart = "${smoke}/bin/stack-smoke-test";
     };

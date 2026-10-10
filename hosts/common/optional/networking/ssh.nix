@@ -1,12 +1,11 @@
 # SSH server — WireGuard mesh only
 # Hardened sshd with fail2ban, bound to WireGuard IP
 
-{ config, lib, ... }:
+{ config, lib, net, ... }:
 
 let
-  secrets = import ../../../../secrets/network.nix;
   hostname = config.networking.hostName;
-  wgIP = secrets.wireguard.meshIPs.${hostname};
+  wgIP = net.wireguard.meshIPs.${hostname};
 in
 {
   services.openssh = {
@@ -38,7 +37,7 @@ in
   # as lab-monitor instead (security/lab-monitor.nix). ssh from the server to another
   # host as oat no longer works, by design.
   users.users.oat.openssh.authorizedKeys.keys =
-    lib.attrValues (removeAttrs secrets.sshKeys [ "server-nixos" ]);
+    lib.attrValues (removeAttrs net.sshKeys [ "server-nixos" ]);
 
   # Rate-limit SSH brute force
   services.fail2ban = {
@@ -49,6 +48,6 @@ in
     # Never ban trusted WireGuard mesh peers — sshd only listens on wg0, so a
     # banned mesh host (e.g. from rapid/automated SSH) locks itself out of all
     # services. The mesh is already encrypted and key-authenticated.
-    ignoreIP = [ "10.100.0.0/24" ];
+    ignoreIP = [ "${net.wireguard.meshSubnet}" ];
   };
 }

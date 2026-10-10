@@ -149,13 +149,16 @@
         };
       };
 
+      # Lab addresses, public keys, Syncthing IDs — passed to every module as `net`.
+      net = import ./lib/network.nix;
+
       # Builder helper for NixOS hosts
       mkSystem = { hostname, hostPath, extraModules ? [], enableHomeManager ? true, enableDesktop ? true }:
         nixpkgs.lib.nixosSystem {
           inherit system;
 
           specialArgs = {
-            inherit system;
+            inherit system net;
             inputs = {
               inherit self nixpkgs nixpkgs-unstable home-manager noctalia mango;
             };
@@ -185,7 +188,7 @@
               ];
               home-manager.users.oat = import ./home/oat/default.nix;
               home-manager.extraSpecialArgs = {
-                inherit system hostname;
+                inherit system hostname net;
                 inputs = {
                   inherit self nixpkgs nixpkgs-unstable home-manager noctalia mango;
                 };

@@ -1,10 +1,9 @@
 # Base networking configuration
 
-{ lib, ... }:
+{ lib, net, ... }:
 
 let
-  secrets = import ../../../secrets/network.nix;
-  ips = secrets.wireguard.meshIPs;
+  ips = net.wireguard.meshIPs;
 in
 {
   networking.networkmanager.enable = lib.mkDefault true;

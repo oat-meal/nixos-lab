@@ -6,7 +6,7 @@
 # and pings the ntfy hub when updates are available. Never touches the real flake
 # or switches anything. Imported by hosts/server (always-on → the timer fires).
 
-{ pkgs, ... }:
+{ pkgs, net, ... }:
 
 let
   advisor = pkgs.writeShellScriptBin "update-advisor" ''
@@ -31,10 +31,10 @@ in
       TimeoutStartSec = "1200";   # `nix flake update` fetches inputs + the LLM call
       Environment = [
         "NIXOS_DIR=/etc/nixos"
-        "OLLAMA_HOST_URL=http://10.100.0.2:11434"
+        "OLLAMA_HOST_URL=http://${net.wireguard.meshIPs.server-nixos}:11434"
         "ADVISOR_MODEL=qwen3:30b-a3b"
         "ADVISOR_REPORT=/var/lib/update-advisor/latest.md"
-        "NTFY_URL=http://10.100.0.2:2586/lab-alerts"
+        "NTFY_URL=http://${net.wireguard.meshIPs.server-nixos}:2586/lab-alerts"
       ];
       ExecStart = "${advisor}/bin/update-advisor";
     };

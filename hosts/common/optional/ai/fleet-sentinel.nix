@@ -6,7 +6,7 @@
 # /var/lib/fleet-sentinel/latest.md (plus a journal summary; optional ntfy push).
 # READ-ONLY — it never changes any host. Imported by hosts/server only.
 
-{ pkgs, ... }:
+{ pkgs, net, ... }:
 
 let
   # Stdlib only — no extra Python deps.
@@ -35,7 +35,7 @@ in
       StateDirectory = "fleet-sentinel";  # /var/lib/fleet-sentinel (oat-owned)
       TimeoutStartSec = "300";            # model load + triage headroom
       Environment = [
-        "OLLAMA_HOST_URL=http://10.100.0.2:11434"
+        "OLLAMA_HOST_URL=http://${net.wireguard.meshIPs.server-nixos}:11434"
         # Left as-is. qwen3:30b-a3b ignores `think: false` in general, but this
         # call passes `format: ENRICH_SCHEMA`, and schema-constrained decoding
         # stops it running on — measured 2026-08-25: 70 tokens, done=stop, 5.5s.
@@ -45,7 +45,7 @@ in
         "SENTINEL_MODEL=qwen3:30b-a3b"
         "KNOWN_STATES=/etc/nixos/docs/audit/known-states.md"
         "SENTINEL_REPORT=/var/lib/fleet-sentinel/latest.md"
-        "NTFY_URL=http://10.100.0.2:2586/lab-alerts"   # self-hosted ntfy (wg0)
+        "NTFY_URL=http://${net.wireguard.meshIPs.server-nixos}:2586/lab-alerts"   # self-hosted ntfy (wg0)
       ];
       ExecStart = "${sentinel}/bin/fleet-sentinel";
     };

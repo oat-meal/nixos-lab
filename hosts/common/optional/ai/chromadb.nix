@@ -2,12 +2,12 @@
 # wg0-only. Data on the systemd StateDirectory (/var/lib/chromadb, rpool) — the
 # store is small; models (the big data) get the dedicated /storage dataset.
 
-{ ... }:
+{ net, ... }:
 
 {
   services.chromadb = {
     enable = true;
-    host = "10.100.0.2"; # wg0
+    host = "${net.wireguard.meshIPs.server-nixos}"; # wg0
     port = 8000;
     openFirewall = false; # firewall handled centrally (wg0-only)
   };

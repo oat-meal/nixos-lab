@@ -3,7 +3,7 @@
 # package natively, so it runs as a pinned community container off AMD's rocm/pytorch
 # base. Data (models/outputs) lives on the /storage/comfyui dataset.
 
-{ lib, ... }:
+{ lib, net, ... }:
 
 {
   virtualisation.podman.enable = true;
@@ -26,7 +26,7 @@
     # a running one is discarded. A Containerfile edit with the tag left alone
     # rebuilds an image nothing refers to.
     image = "localhost/comfyui-gfx1151-impact:v0.2-8";
-    ports = [ "10.100.0.2:8188:8188" ]; # wg0 only
+    ports = [ "${net.wireguard.meshIPs.server-nixos}:8188:8188" ]; # wg0 only
     volumes = [ "/storage/comfyui:/opt/ComfyUI" ]; # models, output, custom nodes persist here
     environment = {
     };

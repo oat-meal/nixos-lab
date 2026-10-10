@@ -2,11 +2,8 @@
 # AMD Ryzen AI Max+ 395, 128GB unified RAM, 2x 1TB NVMe (ZFS mirror)
 # Services: Ollama, Jellyfin, AdGuard Home, NFS
 
-{ config, pkgs, lib, ... }:
+{ config, pkgs, lib, net, ... }:
 
-let
-  secrets = import ../../secrets/network.nix;
-in
 {
   imports = [
     ./hardware-configuration.nix
@@ -218,7 +215,7 @@ in
     ssh = {
       enable = true;
       port = 2222;                                  # distinct from the real sshd
-      authorizedKeys = lib.attrValues secrets.sshKeys;
+      authorizedKeys = lib.attrValues net.sshKeys;
       # Generate once on the host (string path keeps the private key out of the store):
       #   sudo mkdir -p /etc/secrets/initrd
       #   sudo ssh-keygen -t ed25519 -N "" -f /etc/secrets/initrd/ssh_host_ed25519_key
@@ -276,7 +273,7 @@ in
     user = "ollama";
     group = "ollama";
     # Bind to WireGuard IP (firewall also restricts to wg0)
-    host = "10.100.0.2";
+    host = "${net.wireguard.meshIPs.server-nixos}";
     port = 11434;
     # AMD GPU acceleration (Radeon 8060S, RDNA 3.5, ROCm) comes from the package
     # itself — `acceleration` was removed in 26.05. pkgs.unstable.ollama-rocm above
@@ -330,7 +327,7 @@ in
     enable = true;
     mutableSettings = false;
     # Bind web UI to WireGuard IP (firewall also restricts to wg0)
-    host = "10.100.0.2";
+    host = "${net.wireguard.meshIPs.server-nixos}";
     port = 3000;
     settings = {
       dns = {
@@ -352,9 +349,8 @@ in
   services.nfs.server = {
     enable = true;
     exports = let
-      secrets = import ../../secrets/network.nix;
     in ''
-      /storage  ${secrets.wireguard.meshSubnet}(rw,sync,no_subtree_check,root_squash,crossmnt)
+      /storage  ${net.wireguard.meshSubnet}(rw,sync,no_subtree_check,root_squash,crossmnt)
     '';
   };
 

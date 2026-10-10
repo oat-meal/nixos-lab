@@ -6,17 +6,16 @@
 #   sudo chmod 600 /etc/wireguard/private.key
 # Then add each host's public key to secrets/network.nix and redeploy all hosts.
 
-{ config, pkgs, lib, ... }:
+{ config, pkgs, lib, net, ... }:
 
 let
-  secrets = import ../../../../secrets/network.nix;
   hostname = config.networking.hostName;
   sopsEnabled = config.sops.secrets ? "wireguard/${hostname}";
 
-  publicKeys = secrets.wireguard.publicKeys;
-  meshIPs = secrets.wireguard.meshIPs;
-  lanEndpoints = secrets.lanIPs;
-  port = secrets.wireguard.port;
+  publicKeys = net.wireguard.publicKeys;
+  meshIPs = net.wireguard.meshIPs;
+  lanEndpoints = net.lanIPs;
+  port = net.wireguard.port;
 
   myIP = meshIPs.${hostname};
 

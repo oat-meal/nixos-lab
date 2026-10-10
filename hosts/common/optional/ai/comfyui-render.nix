@@ -14,7 +14,7 @@
 # Data: the full ComfyUI tree (core + custom_nodes code + models) lives on the
 # storage/comfyui dataset, rsynced from the server — see the deploy notes below.
 
-{ pkgs, lib, ... }:
+{ pkgs, lib, net, ... }:
 
 {
   virtualisation.podman.enable = true;
@@ -43,7 +43,7 @@
     image = "localhost/comfyui-gfx1201-render:v2";
     ports = [
       "127.0.0.1:8188:8188"  # on-box consumers (bench, smoke test)
-      "10.100.0.1:8188:8188" # wg0 — the Open WebUI image-gen tool on the server
+      "${net.wireguard.meshIPs.workstation-nixos}:8188:8188" # wg0 — the Open WebUI image-gen tool on the server
     ];
     volumes = [ "/storage/comfyui:/opt/ComfyUI" ]; # full ComfyUI tree (rsynced from server)
 

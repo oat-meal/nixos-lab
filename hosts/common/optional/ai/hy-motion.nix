@@ -23,7 +23,7 @@
 # weights live on the storage dataset at /storage/hy-motion and are NOT in this
 # repository — this module is the service definition only.
 
-{ pkgs, ... }:
+{ pkgs, net, ... }:
 
 let
   root = "/storage/hy-motion";
@@ -52,7 +52,7 @@ in
     environment = {
       HY_MOTION_ROOT = root;
       HY_MOTION_SERVE = "${./../../../../ai-lab/hy-motion/serve.py}";
-      HY_MOTION_HOST = "10.100.0.2"; # wg0 only
+      HY_MOTION_HOST = "${net.wireguard.meshIPs.server-nixos}"; # wg0 only
       HY_MOTION_PORT = toString port;
       HY_MOTION_FORCE_CPU = "1";
       HY_MOTION_OUT = "${root}/out-service";

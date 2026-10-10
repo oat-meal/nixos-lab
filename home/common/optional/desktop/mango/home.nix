@@ -11,7 +11,7 @@
 #   - column-stacking (consume/expel) has no direct analog in dwl → omitted.
 #   - column width -/+10% → scroller set_proportion presets (Mod+R cycles).
 
-{ pkgs, inputs, ... }:
+{ pkgs, inputs, net, ... }:
 
 let
   noctalia = inputs.noctalia.packages.${pkgs.stdenv.hostPlatform.system}.default;
@@ -43,7 +43,7 @@ let
   '';
   ntfy-bridge = pkgs.writeShellScript "lab-ntfy-bridge" ''
     while :; do
-      ${pkgs.ntfy-sh}/bin/ntfy subscribe http://10.100.0.2:2586/lab-alerts ${ntfy-notify} || true
+      ${pkgs.ntfy-sh}/bin/ntfy subscribe http://${net.wireguard.meshIPs.server-nixos}:2586/lab-alerts ${ntfy-notify} || true
       sleep 5   # reconnect after a dropped subscription (network blip / server restart)
     done
   '';

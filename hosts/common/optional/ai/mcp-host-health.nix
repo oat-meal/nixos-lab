@@ -2,7 +2,7 @@
 # Read-only system health tools for Claude Code, served over stdio via `ssh` on wg0.
 # Replaces the old imperative ~/.config/mcp/host-health (uv + .venv).
 
-{ pkgs, ... }:
+{ pkgs, net, ... }:
 
 let
   # Python env with just the MCP SDK (provides mcp.server.fastmcp). No venv needed.
@@ -13,7 +13,7 @@ let
   # OLLAMA_HOST points the `ollama` CLI at the wg0-bound server instance.
   host-health-mcp = pkgs.writeShellScriptBin "host-health-mcp" ''
     export PATH=/run/current-system/sw/bin:$PATH
-    export OLLAMA_HOST=10.100.0.2:11434
+    export OLLAMA_HOST=${net.wireguard.meshIPs.server-nixos}:11434
     exec ${pyEnv}/bin/python ${../../../../ai-lab/mcp/host-health/server.py} "$@"
   '';
 in

@@ -3,7 +3,7 @@
 # small, fast model, so CPU inference on the Strix Halo is fine and leaves the iGPU for Ollama/ComfyUI.
 # wg0-only, matching the rest of the lab.
 
-{ lib, ... }:
+{ lib, net, ... }:
 
 {
   virtualisation.podman.enable = true;
@@ -14,7 +14,7 @@
 
   virtualisation.oci-containers.containers.kokoro = {
     image = "ghcr.io/remsky/kokoro-fastapi-cpu:v0.5.0";
-    ports = [ "10.100.0.2:8880:8880" ]; # wg0 only
+    ports = [ "${net.wireguard.meshIPs.server-nixos}:8880:8880" ]; # wg0 only
   };
 
   networking.firewall.interfaces."wg0".allowedTCPPorts = [ 8880 ];

@@ -1,7 +1,7 @@
 # Workstation configuration
 # AMD Ryzen 9950X, dedicated GPU, gaming-optimized
 
-{ config, pkgs, lib, ... }:
+{ config, pkgs, lib, net, ... }:
 
 {
   imports = [
@@ -299,7 +299,7 @@
   ## NFS mount — server storage
   ################################
   fileSystems."/mnt/server" = {
-    device = "10.100.0.2:/storage";
+    device = "${net.wireguard.meshIPs.server-nixos}:/storage";
     fsType = "nfs";
     # hard mount (implicit default) for data integrity; fast-fail so touching
     # /mnt/server while the server is offline errors in ~10s instead of hanging

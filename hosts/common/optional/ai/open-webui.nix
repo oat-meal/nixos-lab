@@ -1,17 +1,17 @@
 # Open WebUI — web chat frontend for the local Ollama models.
 # wg0-only; reachable from the workstation browser over the mesh.
 
-{ ... }:
+{ net, ... }:
 
 {
   services.open-webui = {
     enable = true;
-    host = "10.100.0.2"; # wg0
+    host = "${net.wireguard.meshIPs.server-nixos}"; # wg0
     port = 8080;
     openFirewall = false; # firewall handled centrally (wg0-only)
     environment = {
       # Talk to the local Ollama over wg0.
-      OLLAMA_BASE_URL = "http://10.100.0.2:11434";
+      OLLAMA_BASE_URL = "http://${net.wireguard.meshIPs.server-nixos}:11434";
       # Local RAG embeddings via Ollama (no HF downloads).
       RAG_EMBEDDING_ENGINE = "ollama";
       RAG_EMBEDDING_MODEL = "nomic-embed-text";

@@ -8,10 +8,10 @@
 # Publish:   curl -H "Title: ..." -H "Priority: high" -d "body" http://10.100.0.2:2586/lab-alerts
 # Web UI:    http://10.100.0.2:2586  (over wg0)
 
-{ ... }:
+{ net, ... }:
 
 let
-  host = "10.100.0.2";       # wg0 mesh IP
+  host = "${net.wireguard.meshIPs.server-nixos}";       # wg0 mesh IP
   port = 2586;
 in
 {
