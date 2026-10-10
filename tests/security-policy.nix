@@ -1,5 +1,5 @@
 # Security policy, proven in VMs against the REAL modules (not stand-ins):
-#   networking/wireguard.nix, networking/ssh.nix, security/sudo.nix,
+#   networking/wireguard.nix (+ mesh-zones.nix), networking/ssh.nix, security/sudo.nix,
 #   security/lab-monitor.nix, core/users.nix
 #
 # Run:  nix build .#checks.x86_64-linux.security-policy -L      (needs KVM)
@@ -67,6 +67,13 @@ pkgs.testers.runNixOSTest {
     };
     server-nixos = meshNode "server-nixos" {
       lab.sudoCache = { type = "tty"; minutes = 15; };   # as hosts/server/default.nix
+      # Trust zone: the laptop may open ssh only. A wg0 service on 8099 is the probe.
+      lab.meshZones.laptop-nixos = { tcp = [ 22 ]; };
+      networking.firewall.interfaces."wg0".allowedTCPPorts = [ 8099 ];
+      systemd.services.zone-probe = {
+        wantedBy = [ "multi-user.target" ];
+        serviceConfig.ExecStart = "${pkgs.python3}/bin/python3 -m http.server 8099 --bind 10.100.0.2";
+      };
     };
     stranger = { ... }: { };
   };
@@ -151,7 +158,25 @@ pkgs.testers.runNixOSTest {
     S.succeed("grep -q 'timestamp_type=tty' /etc/sudoers && grep -q 'timestamp_timeout=15' /etc/sudoers")
     ok("sudo cache: workstation global/60, server tty/15")
 
-    print(f"SECURITY-POLICY: {checks}/10 checks passed")
-    assert checks == 10, checks
+    # Mesh trust zone on the server. Control first: the workstation (no zone) opens 8099.
+    tcp = lambda ip, port: f"timeout 5 bash -c '</dev/tcp/{ip}/{port}'"
+    S.wait_for_open_port(8099, "10.100.0.2")
+    W.succeed(tcp("10.100.0.2", 8099))
+    L.fail(tcp("10.100.0.2", 8099))
+    S.wait_until_succeeds("journalctl -k --no-pager | grep -q 'lab-zone laptop-nixos refused'", timeout=10)
+    ok("zone: workstation opens server:8099; laptop refused (logged)")
+
+    # What the zone must NOT break: its allowlisted port, ping, and the server's own
+    # connections to the laptop (replies are not NEW). And a firewall reload keeps it.
+    L.succeed(tcp("10.100.0.2", 22))
+    L.succeed("ping -c1 -W2 10.100.0.2")
+    S.succeed(tcp("10.100.0.3", 22))
+    S.succeed("systemctl reload firewall")
+    L.fail(tcp("10.100.0.2", 8099))
+    assert S.succeed("iptables -S nixos-fw | grep -c lab-zone-laptop-nixos").strip() == "1"
+    ok("zone: laptop ssh + ping ok; server -> laptop unaffected; survives reload (1 jump rule)")
+
+    print(f"SECURITY-POLICY: {checks}/12 checks passed")
+    assert checks == 12, checks
   '';
 }

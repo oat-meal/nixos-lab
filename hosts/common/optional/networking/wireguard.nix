@@ -29,6 +29,8 @@ let
 
 in
 {
+  imports = [ ./mesh-zones.nix ];   # per-peer trust zones; inert until one is declared
+
   environment.systemPackages = with pkgs; [
     wireguard-tools
   ];
