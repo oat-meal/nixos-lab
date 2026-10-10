@@ -216,5 +216,57 @@ in
         };
       };
     })
+
+    (mkIf cfg.target.enable {
+      # ONE timer, pulls IN SEQUENCE. The syncoid module grants `zfs allow` on the target's
+      # PARENT for a dataset that does not exist yet, and every unit's ExecStopPost revokes
+      # it there again. Two pulls overlapping (they all shared one hourly timer) meant one
+      # finishing revoked the parent grant under another's first full receive: "cannot
+      # receive new filesystem stream: permission denied", then syncoid hung. Found by
+      # checks.backup in CI on 2026-10-10 — the test started the next pull while the last
+      # was still in ExecStopPost. Sequential pulls cannot overlap.
+      services.syncoid.interval = [ ];
+      systemd.services = lib.mapAttrs' (n: _: lib.nameValuePair "syncoid-${n}" {
+        serviceConfig = {
+          Type = "oneshot";
+          # A first full send of a large dataset takes hours; a hang must not block every
+          # later pull forever (oneshot has no start timeout by default).
+          TimeoutStartSec = "8h";
+        };
+      }) cfg.target.pulls // {
+        lab-backup-pull = {
+          description = "Backup target: run every syncoid pull, one at a time";
+          after = [ "lab-backup-target.service" ];
+          requires = [ "lab-backup-target.service" ];
+          path = [ config.systemd.package ];
+          serviceConfig.Type = "oneshot";
+          script = ''
+            ok=0; total=0; failed=""
+            for n in ${lib.escapeShellArgs (lib.attrNames cfg.target.pulls)}; do
+              total=$((total + 1))
+              u="syncoid-$n.service"
+              systemctl start "$u" || true
+              # Wait for the unit to be fully down (ExecStopPost included) before the next.
+              while :; do
+                st=$(systemctl show -p ActiveState --value "$u")
+                [ "$st" = inactive ] || [ "$st" = failed ] && break
+                sleep 1
+              done
+              if [ "$(systemctl show -p Result --value "$u")" = success ]; then
+                ok=$((ok + 1))
+              else
+                failed="$failed $n"
+              fi
+            done
+            echo "pulls: $ok/$total ok''${failed:+; failed:$failed}"
+            [ "$ok" -eq "$total" ]
+          '';
+        };
+      };
+      systemd.timers.lab-backup-pull = {
+        wantedBy = [ "timers.target" ];
+        timerConfig.OnCalendar = "hourly";
+      };
+    })
   ];
 }

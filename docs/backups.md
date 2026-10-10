@@ -11,6 +11,11 @@ Until it is, the only protection is same-pool ZFS snapshots.
   datasets only — never destroy. Its key is accepted only from the archive's address.
 - **Pinned host keys.** Remote pulls use strict host-key checking against keys declared in
   config (`pulls.<name>.hostKey`) — no trust-on-first-use.
+- **One timer, pulls in sequence.** `lab-backup-pull` (hourly) runs each `syncoid-<name>` in
+  turn and logs `pulls: N/M ok`. Not one timer per pull: the syncoid module grants and then
+  revokes `zfs allow` on the shared parent, so overlapping pulls revoked each other's grant
+  mid-receive (`permission denied`, then a hang). Found by `checks.backup` in CI, 2026-10-10.
+  Each pull has an 8 h start timeout so one hang cannot block the rest.
 - **Holds.** `--use-hold` keeps the newest replicated snapshot on both sides until the next
   good run, so an incremental base survives a source being offline for days (the laptop).
 - **Retention.** Sources: 24 hourly / 3 daily / 1 monthly. Archive: 30 daily / 24 monthly.
@@ -30,7 +35,7 @@ Until it is, the only protection is same-pool ZFS snapshots.
 | Check | What it proves | Result |
 |---|---|---|
 | `checks.recovery-drill` | the design restores (pull, send-only source, disaster → restore) | 29 files, checksums match, git fsck |
-| `checks.backup` | **this module**, real sanoid/syncoid services, two VMs | 12/12: tiers, remote + local pull, holds both sides, pruning 3→0 hourlies, quota/readonly, no destroy, `from=` refusal, no source→archive credential, byte-identical restore; host keys root-only, re-copied on change, restored byte-identical with mode 600 |
+| `checks.backup` | **this module**, real sanoid/syncoid services, two VMs | 12/12: tiers, remote + local pull in sequence from one timer, holds both sides, pruning 3→0 hourlies, quota/readonly, no destroy, `from=` refusal, no source→archive credential, byte-identical restore; host keys root-only, re-copied on change, restored byte-identical with mode 600 |
 
 Both run in CI (`vm-tests` job) on every push.
 Not proven by VMs: real data volume, restore time at scale, the real disk.

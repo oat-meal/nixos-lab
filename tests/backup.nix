@@ -76,9 +76,11 @@ pkgs.testers.runNixOSTest {
         print(f"PASS  {msg}")
     def run(m, unit):
         # sanoid.service is not Type=oneshot: `systemctl start` returns while it still runs.
-        # Start, wait until the unit has EXITED, then require Result=success.
+        # Start, wait until the unit is fully DOWN, then require Result=success.
+        # Not `is-active`: it is false already during ExecStopPost ("deactivating"), and
+        # moving on then is how this test once overlapped two syncoid units (backup.nix).
         m.succeed(f"systemctl start {unit}")
-        m.wait_until_fails(f"systemctl is-active --quiet {unit}", timeout=120)
+        m.wait_until_succeeds(f"systemctl show -p ActiveState --value {unit} | grep -qxE 'inactive|failed'", timeout=300)
         res = m.succeed(f"systemctl show -p Result --value {unit}").strip()
         if res != "success":
             print(m.succeed(f"journalctl -u {unit} --no-pager -o cat | tail -30"))
@@ -151,14 +153,16 @@ pkgs.testers.runNixOSTest {
     A.succeed("zfs snapshot vault/local@autosnap_2026-01-01_00:00:00_daily")
     ok(f"sanoid on source: hourly, daily, monthly snapshots ({len(s_snaps)})")
 
-    # Pull: both syncoid jobs run as the real services.
-    run(A, "syncoid-src.service")
-    run(A, "syncoid-self.service")
-    run(A, "syncoid-keys.service")
+    # Pull: every syncoid job, through the one sequential runner the timer starts. No
+    # per-unit syncoid timers may exist: they all fired at once and raced (backup.nix).
+    assert A.succeed("systemctl list-timers --all --no-legend 'syncoid-*' | wc -l").strip() == "0"
+    assert "lab-backup-pull.timer" in A.succeed("systemctl list-timers --all --no-legend")
+    run(A, "lab-backup-pull.service")
+    assert "pulls: 3/3 ok" in A.succeed("journalctl -u lab-backup-pull.service --no-pager -o cat")
     got = snaps(A, "vault/backups/src")
     assert any("_daily" in n for n in got) and any("_monthly" in n for n in got), got
     assert snaps(A, "vault/backups/self"), "local pull landed nothing"
-    ok(f"pulls: remote -> vault/backups/src ({len(got)} snapshots), local -> vault/backups/self")
+    ok(f"pulls 3/3 in sequence, one timer: remote -> src ({len(got)} snapshots), local -> self, keys")
 
     # --use-hold: newest replicated snapshot held on source and archive.
     assert "syncoid" in S.succeed(f"zfs holds {s_snaps[-1]}"), "no hold on source"
@@ -200,7 +204,7 @@ pkgs.testers.runNixOSTest {
     S.succeed("systemctl restart lab-backup-source.service")
     S.succeed(f"cmp /etc/ssh/ssh_host_ed25519_key {mp}/ssh/ssh_host_ed25519_key")
     S.succeed("zfs snapshot tank/lab-hostkeys@autosnap_2026-10-10_00:00:00_daily")
-    run(A, "syncoid-keys.service")
+    run(A, "lab-backup-pull.service")
     k = snaps(A, "vault/backups/keys")[-1]
     A.succeed(f"zfs send {k} | zfs receive -o mountpoint=/mnt/keys vault/keysrestore")
     want = S.succeed("sha256sum < /etc/ssh/ssh_host_ed25519_key").split()[0]
