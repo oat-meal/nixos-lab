@@ -54,7 +54,7 @@ def quorum(body: Question):
     """Ask the same question to several local models independently, then reconcile
     their answers into one cross-referenced response to reduce hallucinations. Use
     for high-stakes or factual questions where accuracy matters more than speed."""
-    return {"result": run("QUORUM_PY", body.question)}
+    return {"result": run("QUORUM_PY", "--", body.question)}
 
 
 @app.post("/rag", operation_id="lab_rag_query", summary="Query the local document knowledge base (RAG)")
@@ -62,7 +62,7 @@ def rag(body: Question):
     """Answer a question grounded in the local ingested documents/notes
     (retrieval-augmented generation via ChromaDB + local embeddings). Use when the
     answer should come from the user's own knowledge base rather than general knowledge."""
-    return {"result": run("RAG_PY", "query", body.question)}
+    return {"result": run("RAG_PY", "query", "--", body.question)}
 
 
 @app.post("/research", operation_id="lab_research", summary="Deep web research with citations")
@@ -70,7 +70,7 @@ def research(body: Question):
     """Search the web via the private SearXNG instance, read the top sources, and
     synthesize a cited answer. Use for current events or information likely outside
     the model's training data. May take up to a minute."""
-    return {"result": run("RESEARCH_PY", body.question)}
+    return {"result": run("RESEARCH_PY", "--", body.question)}
 
 
 @app.get("/", include_in_schema=False)

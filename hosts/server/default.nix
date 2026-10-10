@@ -223,7 +223,8 @@
     ssh = {
       enable = true;
       port = 2222;                                  # distinct from the real sshd
-      authorizedKeys = lib.attrValues net.sshKeys;
+      # People's keys only: the server's own key is used unattended (see ssh.nix).
+      authorizedKeys = lib.attrValues (removeAttrs net.sshKeys [ "server-nixos" ]);
       # Generate once on the host (string path keeps the private key out of the store):
       #   sudo mkdir -p /etc/secrets/initrd
       #   sudo ssh-keygen -t ed25519 -N "" -f /etc/secrets/initrd/ssh_host_ed25519_key
@@ -409,6 +410,9 @@
   ################################
   ## User groups + SSH access
   ################################
+  # sudo password cache per terminal, 15 min (see security/sudo.nix, lab.sudoCache).
+  lab.sudoCache = { type = "tty"; minutes = 15; };
+
   # Units oat may start/stop/restart without sudo (polkit; see security/sudo.nix).
   lab.restartableUnits = [
     "adguardhome.service"

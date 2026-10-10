@@ -5,9 +5,12 @@
 #   2. Passwordless, bounded. The lab-* wrappers below take no free-form arguments, and
 #      polkit lets oat start/stop/restart the units a host lists in
 #      lab.restartableUnits — `systemctl restart <unit>` with no sudo at all.
-#   3. Everything else needs the password, cached for 60 minutes across every terminal
-#      (timestamp_type=global). That cache is shared with agents running as oat: after
-#      you type it once, a Claude session can sudo for the rest of the hour.
+#   3. Everything else needs the password. By default it is cached for 60 minutes across
+#      every terminal (timestamp_type=global), shared with agents running as oat: after
+#      you type it once, a Claude session can sudo for the rest of the hour. Hosts can
+#      narrow this with lab.sudoCache — the server does (tty, 15 min): nobody works there
+#      interactively, unattended jobs run as oat, and every deploy would otherwise open a
+#      root window for all of them.
 #
 # What this replaced: NOPASSWD for nixos-rebuild, nix*, systemctl, git, podman, zfs,
 # zpool, iptables/ip6tables/nft and ss (+ udevadm on the server). That list was called
@@ -66,6 +69,19 @@ let
   ];
 in
 {
+  options.lab.sudoCache = {
+    type = lib.mkOption {
+      type = lib.types.enum [ "global" "tty" "ppid" ];
+      default = "global";
+      description = "sudo timestamp_type: share the password cache across terminals, or per terminal.";
+    };
+    minutes = lib.mkOption {
+      type = lib.types.ints.positive;
+      default = 60;
+      description = "sudo timestamp_timeout in minutes.";
+    };
+  };
+
   options.lab.restartableUnits = lib.mkOption {
     type = lib.types.listOf lib.types.str;
     default = [ ];
@@ -76,8 +92,8 @@ in
     environment.systemPackages = wrappers;
 
     security.sudo.extraConfig = ''
-      Defaults timestamp_type=global
-      Defaults timestamp_timeout=60
+      Defaults timestamp_type=${config.lab.sudoCache.type}
+      Defaults timestamp_timeout=${toString config.lab.sudoCache.minutes}
     '';
 
     security.sudo.extraRules = [{

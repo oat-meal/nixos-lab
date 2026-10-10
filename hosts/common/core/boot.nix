@@ -15,6 +15,15 @@
   # is still a deep rollback history.
   boot.loader.systemd-boot.configurationLimit = lib.mkDefault 10;
 
+  # No kernel-command-line editing at the boot menu. With it on (the NixOS default),
+  # anyone at the console can append `init=/bin/sh` — and on the server, whose LUKS
+  # unlocks from the TPM (PCRs 0+7) with no Secure Boot, the disks unlock regardless
+  # and that is a root shell. Off, previous generations are still selectable; only
+  # editing is gone. Not a full fix for the server: booting other media is still
+  # possible until Secure Boot or a tighter PCR policy lands (found by a cold review,
+  # 2026-10-09).
+  boot.loader.systemd-boot.editor = false;
+
   # All three hosts are ZFS-root, so this applies fleet-wide.
   #
   # Pinned to the CURRENT default rather than changed. 26.05 warns that this flips to
