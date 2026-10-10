@@ -68,6 +68,8 @@ installer/             # Custom installer ISO
 docs/
 ├── deployment.md            # Canonical change→deploy cycle (deploy.sh, monthly flake update)
 ├── deployment-issues.md     # Past failures + fixes (incl. root-run git corruption)
+├── bare-metal-rebuild.md    # Blank-disk rebuild: per-host state outside git, re-key, traps
+├── backups.md               # lab.backup design + runbook (not enabled yet)
 ├── kernel-module-autoload.md # systemd-initrd switch_root bug (hit laptop + server)
 ├── portal-filechooser.md    # xdg-desktop-portal: FileChooser + AppChooser/PATH failures
 ├── searxng-engines-degraded.md # SearXNG web engines blocked/disabled; API engines only

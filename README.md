@@ -159,6 +159,8 @@ nixos-lab/
     ├── nixos-primer.md              # Intro to this flake for NixOS newcomers
     ├── deployment.md                # Deployment guide
     ├── deployment-issues.md         # Deployment lessons learned
+    ├── bare-metal-rebuild.md        # Rebuild a host from a blank disk: state git does not hold
+    ├── backups.md                   # Backup design, proof and deploy runbook
     ├── portal-filechooser.md        # xdg-desktop-portal FileChooser fix
     ├── kernel-module-autoload.md    # systemd-initrd switch_root module-load bug
     ├── searxng-engines-degraded.md  # SearXNG web engines disabled; API engines only
