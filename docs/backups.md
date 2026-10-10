@@ -39,16 +39,22 @@ Not proven by VMs: real data volume, restore time at scale, the real disk.
 | server | `rpool/storage/gameserver-backups` | 0.2 GB | |
 | server | `rpool/home` | 12 GB | |
 | laptop | `rpool/home` | 22 GB | pulled when the laptop is home |
-| — | **decide:** server `rpool/storage` itself | 499 GB held directly (not in a child) | contents unreviewed |
+| server | `rpool/storage/workstation-backup` (to be split out — runbook step 0) | 2.2 GB | GitHub recovery codes, the nixos-lab pre-rewrite bundle, the old game-design archive — irreplaceable |
 
 Excluded as replaceable: the workstation's whole `storage` pool — `storage/data` (`/storage`,
 124 GB), `storage/steam` (588 GB), `storage/comfyui` — which holds game installs, Steam and
 models (oat, 2026-10-10: "all replaceable and non critical"); also `rpool/storage/ollama`
 (102 GB), `rpool/storage/comfyui` (models) and `media/library` (expendable media).
-Proposed total ≈ 245 GB (+ history), against a default quota of 2 TB.
+Server `rpool/storage` itself is excluded (oat, 2026-10-10): `fsimport` (395 GB, expendable
+media) moves to the 20 TB disk, `lora-training` (33 GB) is being deleted, `hy-motion` (98 GB)
+is a re-downloadable checkout + weights. Proposed total ≈ 245 GB (+ history), quota 2 TB.
 
 ## Runbook
 
+0. **Split `workstation-backup` into its own dataset** (backups work per dataset; today it is a
+   plain directory inside `rpool/storage`). On the server:
+   `sudo zfs create rpool/storage/workstation-backup-new && sudo rsync -aHAX /storage/workstation-backup/ /storage/workstation-backup-new/ && sudo mv /storage/workstation-backup /storage/workstation-backup-old && sudo zfs rename rpool/storage/workstation-backup-new rpool/storage/workstation-backup`
+   — compare, then remove `-old`.
 1. **Move the disk to the server** (backlog item 17): on the workstation
    `sudo zpool export media && sudo cryptsetup close media`; attach to the server; declare it
    there (crypttab entry with `nofail` + TPM2 enrolment, `boot.zfs.extraPools = [ "media" ]`).
