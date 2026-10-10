@@ -158,7 +158,7 @@ bridged into the desktops' Noctalia notification center) — no cloud. Throughou
 local LLM only triages/summarizes; severities are assigned deterministically in code.
 
 - **fleet-sentinel** (server, nightly) — fleet health (failed units, disk, ZFS, journal
-  errors filtered against `docs/audit/known-states.md`) **plus backup integrity** (each
+  errors filtered against `docs/audit/known-states.md`) **plus snapshot freshness** (same-pool ZFS snapshots, not off-host backups) (each
   auto-snapshot dataset must have recent snapshots). `qwen3` annotates each finding and
   writes the summary. → `/var/lib/fleet-sentinel/latest.md` + ntfy.
 - **post-rebuild verifier** (server + laptop) — an activation hook checks for
@@ -207,7 +207,7 @@ A read-only **host-health MCP server** (`ai-lab/mcp/host-health/`, invoked as
 | `fleet_health` | one-shot health snapshot across all three hosts (uptime, failed units, disk, ZFS, generation) |
 | `fleet_service_status` | systemd service state per host |
 | `fleet_journal_errors` | recent journal errors per host |
-| `backup_status` | ZFS-snapshot backup integrity + last scrub, fleet-wide |
+| `backup_status` | ZFS snapshot freshness + last scrub, fleet-wide (same-pool snapshots, not off-host backups) |
 | `flake_status` | days-since-update per flake input |
 | `zfs_snapshots` | list a dataset's snapshots (+ recover-a-file hint) |
 

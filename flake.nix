@@ -44,6 +44,11 @@
     # Pinned to the nixos-unstable CHANNEL revision, not a nixpkgs master commit,
     # so the dependency closure comes from the binary cache instead of building
     # locally. Bump THIS input alone to move Claude Code; nothing else rides it.
+    #
+    # 2026-10-09: the Phase 4 update moved nixpkgs-unstable to this same revision
+    # on purpose — ollama-rocm 0.40 was benchmarked first (+8% tok/s, 100% GPU) and
+    # mango was held back on its own lock entry. The two inputs coincide today; they
+    # stay separate so either can move without the other.
     nixpkgs-claude.url = "github:NixOS/nixpkgs/e7439b6b14ad3cc35d05608ebca9bce01a25f5f8";
 
     # Home Manager
@@ -76,11 +81,14 @@
     # desktop hosts (niri fully removed 2026-07-04).
     #
     # Follows nixpkgs-unstable, NOT nixpkgs: since 2026-07-08 mango requires
-    # wlroots_0_20, which 25.11 does not package (it stops at 0_19). Pinning
+    # wlroots_0_20, which 25.11 did not package (it stopped at 0_19). Pinning
     # mango back to a wlroots_0_19 rev is not an option — the selmon NULL-deref
     # fix in keypress() landed after that bump, and that crash takes the whole
     # session down on the first keypress after the only monitor sleeps.
-    # Revisit if/when 25.11 gains wlroots_0_20.
+    # 2026-10-09: the base is now 26.05, which DOES package wlroots_0_20 (0.20.0),
+    # so following stable nixpkgs is possible. Not switched here: it changes how the
+    # desktop is built, and belongs with the mango config migration (upstream renamed
+    # 12 config keywords; the input is held back until that lands).
     mango = {
       url = "github:mangowm/mango";
       inputs.nixpkgs.follows = "nixpkgs-unstable";

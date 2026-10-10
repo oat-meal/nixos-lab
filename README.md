@@ -12,6 +12,10 @@ Angle-bracket tokens in the docs are placeholders — replace them with your own
 | `<server-lan-ip>`, `<laptop-lan-ip>` | Your hosts' LAN addresses |
 | `<lan-subnet>` | Your LAN subnet (e.g. `192.0.2.0/24`) |
 
+Placeholders keep the docs readable for any lab. This lab's real values are in
+`hosts/network.nix`, which is plaintext and public by design: addresses and public keys
+are not secrets here (private keys are in sops).
+
 Host names (`workstation-nixos`, `laptop-nixos`, `server-nixos`) are examples — rename them for your own machines. WireGuard mesh addresses (`10.100.0.x`) are shown as-is; substitute your own mesh range.
 
 > New to NixOS? See [docs/nixos-primer.md](docs/nixos-primer.md)
@@ -146,7 +150,7 @@ nixos-lab/
 │   ├── quorum/                      # Multi-model quorum CLI
 │   ├── rag/                         # RAG (ChromaDB + embeddings) CLI
 │   ├── research/                    # Deep-research CLI (SearXNG → synthesize)
-│   ├── sentinel/                    # Nightly fleet-health + backup-integrity sentinel; SearXNG search-sentinel
+│   ├── sentinel/                    # Nightly fleet-health + snapshot-freshness sentinel; SearXNG search-sentinel
 │   ├── smoke-test/                  # AMD ROCm stack smoke test (module kept, imported by no host)
 │   └── update-advisor/              # Weekly flake-update risk advisor
 │
@@ -234,8 +238,11 @@ IPs and keys are in `hosts/network.nix`. The network topology:
 
 ## Security
 
-- LUKS2 with argon2id key derivation
-- YubiKey FIDO2 for disk unlock (optional second factor)
+- LUKS2 with argon2id key derivation on every host
+- Disk unlock: workstation and laptop by passphrase or YubiKey FIDO2; the headless server
+  by TPM2 (PCRs 0+7, passphrase slot kept as fallback). No Secure Boot yet, so the TPM
+  binding is weaker than it looks — the boot-menu editor is off, but other boot media can
+  still request the key
 - sudo requires the password (60-min cache); NOPASSWD only for three read-only `lab-*` wrappers; listed services restart via polkit
 - Server automation reaches other hosts as `lab-monitor` (journal access only), never as the user
 - SSH restricted to WireGuard mesh: `openFirewall = false`, `ListenAddress` bound to each host's WireGuard IP, fail2ban on all hosts
@@ -255,7 +262,7 @@ Headline: a Mixture-of-Experts model (`qwen3:30b-a3b`) hits **~62 tok/s** on the
 server's iGPU — faster than the 7B dense models while carrying 30B-class knowledge —
 and FLUX.1-schnell generates a 1024×1024 image in **~6.7 s** warm on the workstation.
 
-The lab also **self-monitors**: a nightly fleet-health + backup-integrity sentinel, a
+The lab also **self-monitors**: a nightly fleet-health + snapshot-freshness sentinel (same-pool ZFS snapshots — not off-host backups), a
 post-rebuild verifier (server + laptop), a GPU-wedge sentinel (workstation), a SearXNG
 search-sentinel (server, 08:15/20:15), and a weekly flake-update advisor —
 all pushing to a private self-hosted ntfy hub (bridged into the desktops' notifications).
