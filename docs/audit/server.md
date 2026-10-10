@@ -37,7 +37,7 @@ now declared via `networking.networkmanager.ensureProfiles`.
 ~~**Open item (router-side):** `192.168.10.50` must sit outside the DHCP pool, or be reserved
 for `9c:bf:0d:01:03:73`.~~ **DONE 2026-08-16** (reserved at the router — see Pending validation #2).
 (2026-10-09: box found on DHCP .93 — NM auto-default profile won the race; fixed in config with
-`no-auto-default`, pending deploy.)
+`no-auto-default` (90e5e70); deployed and switched live to .50 the same day.)
 
 ## Headless disk unlock (2026-08-16)
 
