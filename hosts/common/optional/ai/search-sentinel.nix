@@ -35,7 +35,8 @@ in
     # Doing so on the workstation raced the WCN7850 firmware init and wedged the
     # card — docs/audit/postmortem-2026-08-wcn7850-wifi.md.
     after = [ "network-online.target" "uwsgi.service" ];
-    serviceConfig = {
+    serviceConfig = (import ../../sandbox.nix) // {
+      MemoryDenyWriteExecute = true;   # stdlib-only python, no JIT
       Type = "oneshot";
       DynamicUser = true;          # needs no state, no keys, no filesystem
       TimeoutStartSec = "300";      # four engines x 45 s, with headroom

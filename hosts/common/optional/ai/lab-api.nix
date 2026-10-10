@@ -22,7 +22,7 @@ in
       RAG_PY = "${../../../../ai-lab/rag/rag.py}";
       RESEARCH_PY = "${../../../../ai-lab/research/research.py}";
     };
-    serviceConfig = {
+    serviceConfig = (import ../../sandbox.nix) // {   # baseline; measured in docs/audit/systemd-security-baseline.md
       DynamicUser = true;
       ExecStart = "${pyEnv}/bin/python -m uvicorn server:app --host ${net.wireguard.meshIPs.server-nixos} --port 8091 --app-dir ${apiDir}";
       Restart = "on-failure";

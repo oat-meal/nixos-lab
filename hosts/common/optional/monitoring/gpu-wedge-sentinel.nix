@@ -129,7 +129,11 @@ in
     #
     # Same reasoning for no Persistent=true on the timer: replaying a missed wedge check
     # after a reboot is pointless, since the reboot is what clears the condition.
-    serviceConfig = {
+    serviceConfig = (import ../../sandbox.nix) // {
+      # Needs: GPU sysfs + rocm-smi (devices), and `ps` over other users' processes.
+      PrivateDevices = false;
+      ProtectProc = "default";
+      ProtectHome = "read-only";
       Type = "oneshot";
       User = "oat";
       # Comfortably over the 60s internal re-sample; bounded so a blocked rocm-smi

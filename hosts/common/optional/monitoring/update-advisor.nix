@@ -25,6 +25,24 @@ in
     # workstation WCN7850 WiFi — see docs/audit/postmortem-2026-08-wcn7850-wifi.md.
     after = [ "network-online.target" "ollama.service" ];
     serviceConfig = {
+      # Light sandboxing: it runs `nix flake update` as oat, which writes ~/.cache/nix, so no
+      # ProtectHome / ProtectSystem=strict / namespace or syscall filters here.
+      NoNewPrivileges = true;
+      PrivateTmp = true;
+      PrivateDevices = true;
+      ProtectSystem = "full";
+      ProtectKernelTunables = true;
+      ProtectKernelModules = true;
+      ProtectKernelLogs = true;
+      ProtectControlGroups = true;
+      ProtectClock = true;
+      ProtectHostname = true;
+      RestrictSUIDSGID = true;
+      RestrictRealtime = true;
+      LockPersonality = true;
+      SystemCallArchitectures = "native";
+      RestrictAddressFamilies = [ "AF_UNIX" "AF_INET" "AF_INET6" ];
+      CapabilityBoundingSet = "";
       Type = "oneshot";
       User = "oat";
       StateDirectory = "update-advisor";

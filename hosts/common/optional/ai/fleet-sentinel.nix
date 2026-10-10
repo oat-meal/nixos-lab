@@ -29,7 +29,13 @@ in
     # the daily run correctly (network-online is reached by the network stack).
     after = [ "network-online.target" "ollama.service" ];
     path = [ pkgs.openssh ];              # ssh to workstation/laptop over wg0
-    serviceConfig = {
+    serviceConfig = (import ../../sandbox.nix) // {
+      # Needs: ~oat/.ssh (lab_monitor key, known_hosts), /dev/zfs for its local probe.
+      ProtectHome = "read-only";
+      ReadWritePaths = [ "/home/oat/.ssh" ];
+      PrivateDevices = false;
+      DevicePolicy = "closed";
+      DeviceAllow = [ "/dev/zfs rw" ];
       Type = "oneshot";
       User = "oat";                       # uses oat's ssh keys + systemd-journal group
       StateDirectory = "fleet-sentinel";  # /var/lib/fleet-sentinel (oat-owned)

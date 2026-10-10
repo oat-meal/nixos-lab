@@ -59,7 +59,11 @@ in
       HY_MOTION_LDPATH_CACHE = "/var/lib/hy-motion/ldpath";
     };
 
-    serviceConfig = {
+    serviceConfig = (import ../../sandbox.nix) // {
+      # torch: no MemoryDenyWriteExecute, and OpenMP thread affinity is in @resources.
+      SystemCallFilter = [ "@system-service" "~@privileged" ];
+      RestrictAddressFamilies = [ "AF_UNIX" "AF_INET" "AF_INET6" "AF_NETLINK" ];
+      ReadWritePaths = [ "/storage/hy-motion/out-service" ];
       Type = "exec";
       # Its own user since 2026-10-09; it ran as oat because oat owns the checkout.
       # It is a network service, so a bug in it was a shell as oat — and oat's ssh
