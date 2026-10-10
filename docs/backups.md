@@ -34,7 +34,6 @@ Not proven by VMs: real data volume, restore time at scale, the real disk.
 | Host | Dataset | Size | Why |
 |---|---|---|---|
 | workstation | `rpool/home` | ~200 GB after `~/Downloads/fs-mp4` is removed | includes forge `reference/` — 105 files in no git history |
-| workstation | `storage/data` (`/storage`) | 124 GB | |
 | server | `rpool/storage/git` | 0.5 GB | every bare repo incl. the vault — irreplaceable |
 | server | `rpool/storage/reference` | 7.6 GB | EthrA reference recordings |
 | server | `rpool/storage/gameserver-backups` | 0.2 GB | |
@@ -42,9 +41,11 @@ Not proven by VMs: real data volume, restore time at scale, the real disk.
 | laptop | `rpool/home` | 22 GB | pulled when the laptop is home |
 | — | **decide:** server `rpool/storage` itself | 499 GB held directly (not in a child) | contents unreviewed |
 
-Excluded as re-downloadable: `storage/steam` (588 GB), `rpool/storage/ollama` (102 GB),
-`storage/comfyui` / `rpool/storage/comfyui` (models), `media/library` (expendable media).
-Proposed total ≈ 370 GB (+ history), against a default quota of 2 TB.
+Excluded as replaceable: the workstation's whole `storage` pool — `storage/data` (`/storage`,
+124 GB), `storage/steam` (588 GB), `storage/comfyui` — which holds game installs, Steam and
+models (oat, 2026-10-10: "all replaceable and non critical"); also `rpool/storage/ollama`
+(102 GB), `rpool/storage/comfyui` (models) and `media/library` (expendable media).
+Proposed total ≈ 245 GB (+ history), against a default quota of 2 TB.
 
 ## Runbook
 
