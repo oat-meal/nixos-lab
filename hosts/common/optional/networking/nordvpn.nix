@@ -56,18 +56,14 @@
         status)
           sudo wg show wgnord 2>/dev/null || echo "Not connected"
           ;;
-        list)
-          wgnord list-servers
-          ;;
         *)
           echo "NordVPN Helper Script"
-          echo "Usage: nordvpn-helper {connect|disconnect|status|list}"
+          echo "Usage: nordvpn-helper {connect|disconnect|status}"
           echo ""
           echo "Commands:"
           echo "  connect <country>  - Connect to NordVPN server in specified country"
           echo "  disconnect         - Disconnect from NordVPN"
           echo "  status            - Show current connection status"
-          echo "  list              - List available countries"
           echo ""
           echo "Examples:"
           echo "  nordvpn-helper connect us"

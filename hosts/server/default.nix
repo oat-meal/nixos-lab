@@ -1,6 +1,6 @@
 # Framework Server — headless home server
 # AMD Ryzen AI Max+ 395, 128GB unified RAM, 2x 1TB NVMe (ZFS mirror)
-# Services: Ollama, Jellyfin, AdGuard Home, NFS
+# Services: Ollama, Jellyfin, AdGuard Home, NFS, and the AI-lab stack (see docs/ai-lab.md)
 
 { config, pkgs, lib, net, ... }:
 
@@ -164,6 +164,14 @@
   # default is not an mkDefault.
   boot.kernel.sysctl."net.ipv4.ip_forward" = lib.mkForce true;
   boot.kernel.sysctl."net.ipv4.conf.all.forwarding" = lib.mkForce true;
+
+  # ...and stop NM generating "Wired connection N" DHCP profiles at all. Priority only
+  # decides which profile AUTO-activates; it does not displace one already up. Found
+  # 2026-10-09: NM brought up its auto-generated DHCP profile before ensureProfiles
+  # wrote wired-static, so the box ran on 192.168.10.93 (DHCP) for its whole 29-day
+  # uptime while everything declared — and hosts/network.nix — said .50. The mesh
+  # still worked only because WireGuard roams to whatever address a peer sends from.
+  networking.networkmanager.settings.main.no-auto-default = "*";
 
   networking.networkmanager.ensureProfiles.profiles.wired-static = {
     connection = {
@@ -361,16 +369,21 @@
     enable = true;
     logRefusedConnections = true;
     # LAN-accessible services (needed by phones, TVs, other LAN clients)
+    #
+    # Jellyfin is NOT here since 2026-10-09: its first-run wizard was never completed
+    # (StartupWizardCompleted=false, zero users), and in that state anyone on the LAN
+    # can finish it and become Jellyfin's administrator — the /Startup endpoints
+    # answer without auth. It is wg0-only below until an admin account exists; move
+    # 8096 back here after completing setup over http://10.100.0.2:8096.
     allowedTCPPorts = [
       53     # AdGuard DNS
-      8096   # Jellyfin
     ];
     allowedUDPPorts = [
       53     # AdGuard DNS
     ];
     # WireGuard-only services (admin/internal)
-    # 22=SSH  111/2049=NFS  3000=AdGuard-UI  11434=Ollama  8080=Open-WebUI  8888=SearXNG  8000=ChromaDB
-    interfaces."wg0".allowedTCPPorts = [ 22 111 2049 3000 11434 8080 8888 8000 ];
+    # 22=SSH  111/2049=NFS  3000=AdGuard-UI  11434=Ollama  8080=Open-WebUI  8888=SearXNG  8000=ChromaDB  8096=Jellyfin
+    interfaces."wg0".allowedTCPPorts = [ 22 111 2049 3000 11434 8080 8888 8000 8096 ];
     interfaces."wg0".allowedUDPPorts = [ 111 2049 ];
     interfaces."wg0".allowedUDPPortRanges = [
       { from = 60000; to = 60010; }  # Mosh
@@ -412,7 +425,6 @@
     "uwsgi.service"
     "fleet-sentinel.service"
     "search-sentinel.service"
-    "stack-smoke-test.service"
     "update-advisor.service"
     "syncthing.service"
     "wireguard-wg0.service"
