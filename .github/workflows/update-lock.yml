@@ -1,0 +1,76 @@
+# Monthly input update, proposed on a branch — never merged automatically.
+#
+# Updates every input EXCEPT the two held on purpose (see flake.nix):
+#   mango          — upstream renamed 12 config keywords; held until the config migrates
+#   nixpkgs-claude — pinned separately so Claude Code moves alone
+# Then runs the same gates as check.yml (evaluate everything, run every VM test) and pushes
+# branch `update-flake-lock` ONLY if they pass. Merge it yourself:
+#   git fetch origin && git merge --ff-only origin/update-flake-lock && git push
+# and deploy with `nixos-rebuild boot` + reboot if systemd moved (memory: reexec freeze).
+#
+# Runs its own gates because a push made with GITHUB_TOKEN does not trigger other workflows.
+# No third-party action and no repo setting change: it pushes a branch, it opens no PR.
+
+name: update-lock
+
+on:
+  schedule:
+    - cron: "17 6 1 * *"   # monthly: the 1st, 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Enable KVM for the Nix build users
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+        with:
+          extra_nix_config: |
+            system-features = nixos-test benchmark big-parallel kvm
+      - name: Update inputs (not mango, not nixpkgs-claude)
+        run: |
+          nix flake update nixpkgs nixpkgs-unstable home-manager sops-nix noctalia zen-browser 2>&1 | tee update.log
+          if git diff --quiet flake.lock; then echo "no input changed"; echo "CHANGED=0" >> "$GITHUB_ENV"; else echo "CHANGED=1" >> "$GITHUB_ENV"; fi
+      - name: Gate — evaluate every target
+        if: env.CHANGED == '1'
+        run: |
+          nix flake check --no-build
+          ok=0; total=0
+          for t in nixosConfigurations.workstation-nixos.config.system.build.toplevel \
+                   nixosConfigurations.laptop-nixos.config.system.build.toplevel \
+                   nixosConfigurations.server-nixos.config.system.build.toplevel \
+                   packages.x86_64-linux.installer-iso; do
+            total=$((total + 1))
+            if nix eval --raw ".#$t.drvPath" >/dev/null; then ok=$((ok + 1)); else echo "FAIL  $t"; fi
+          done
+          echo "evaluated: $ok/$total"
+          [ "$ok" -eq "$total" ]
+      - name: Gate — run every VM test
+        if: env.CHANGED == '1'
+        run: |
+          tests=$(nix eval --json .#checks.x86_64-linux --apply builtins.attrNames | jq -r '.[]')
+          ok=0; total=0
+          for t in $tests; do
+            total=$((total + 1))
+            if nix build -L ".#checks.x86_64-linux.$t"; then ok=$((ok + 1)); else echo "FAIL  $t"; fi
+          done
+          echo "vm tests: $ok/$total"
+          [ "$total" -gt 0 ] && [ "$ok" -eq "$total" ]
+      - name: Push branch update-flake-lock (only reached if every gate passed)
+        if: env.CHANGED == '1'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c update-flake-lock
+          { echo "flake: monthly input update (scheduled, gates passed)"; echo; grep -E "Updated input|→" update.log | sed 's/^/  /'; } > msg.txt
+          git commit -q -F msg.txt flake.lock
+          git push --force origin update-flake-lock
+          echo "pushed update-flake-lock — merge with: git merge --ff-only origin/update-flake-lock"
