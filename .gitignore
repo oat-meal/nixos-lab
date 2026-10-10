@@ -1,7 +1,6 @@
 result
 *.swp
 *.swm
-# secrets/network.nix is tracked but encrypted via git-crypt
 *.iso
 
 # Experimental packages - not tracked in git

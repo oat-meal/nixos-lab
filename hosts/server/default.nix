@@ -129,9 +129,9 @@
   # The wired address is declared here rather than left to a hand-made NetworkManager
   # profile. The previous static .50 profile was created by hand and vanished across a
   # reboot — NM fell back to an auto-generated DHCP profile and took .84, while
-  # secrets/network.nix still advertised .50 as this host's wg0 endpoint. The mesh then
+  # lib/network.nix still advertised .50 as this host's wg0 endpoint. The mesh then
   # only converged in the direction the server happened to initiate. Declaring the
-  # profile keeps the address and secrets/network.nix in agreement by construction.
+  # profile keeps the address and lib/network.nix in agreement by construction.
   #
   # NOTE: .50 must sit outside the router's DHCP pool, or be reserved for
   # 9c:bf:0d:01:03:73, otherwise the lease can be handed to another device.

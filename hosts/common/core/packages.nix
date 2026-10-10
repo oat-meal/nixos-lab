@@ -7,7 +7,6 @@
   environment.systemPackages = with pkgs; [
     # Core CLI tools
     git
-    git-crypt
     wget
     curl
     neovim

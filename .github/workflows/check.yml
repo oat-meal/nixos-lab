@@ -1,0 +1,54 @@
+# Evaluation + content guard on every push and PR.
+#
+# Evaluates, never builds: the ROCm closures are far too heavy for a hosted runner,
+# and evaluation is what catches the failures that have actually happened here — a
+# flake output that never built (the installer ISO, until 1347087) and module errors.
+# Possible only since lib/network.nix left git-crypt (cdd0d69); before that no clean
+# checkout could evaluate anything.
+#
+# Actions are pinned to commit SHAs, not tags: this repo deploys as root, and a tag
+# can be moved. Bump them deliberately (tag noted beside each).
+
+name: check
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  content-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: No lab content in the public repo (every tracked file)
+        run: |
+          bash .githooks/pre-commit --all
+          echo "content guard: $(git ls-files | wc -l) tracked files checked"
+
+  evaluate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+      - name: flake check (no build)
+        run: nix flake check --no-build --show-trace
+      - name: Evaluate every system and the installer ISO
+        run: |
+          targets="nixosConfigurations.workstation-nixos.config.system.build.toplevel
+                   nixosConfigurations.laptop-nixos.config.system.build.toplevel
+                   nixosConfigurations.server-nixos.config.system.build.toplevel
+                   packages.x86_64-linux.installer-iso"
+          ok=0; total=0
+          for t in $targets; do
+            total=$((total + 1))
+            if drv=$(nix eval --raw ".#$t.drvPath"); then
+              ok=$((ok + 1)); echo "OK    $t -> ${drv##*/}"
+            else
+              echo "FAIL  $t"
+            fi
+          done
+          echo "evaluated: $ok/$total"
+          [ "$ok" -eq "$total" ]

@@ -32,7 +32,7 @@ push_repo() {
   # send, and the remote rebuilt an identical closure. The clean-tree guard above
   # now catches this before anything is pushed, so staging here is both
   # unnecessary and actively misleading.
-  nix-shell -p git-crypt --run 'git push'
+  git push
 }
 
 rebuild_remote() {

@@ -3,7 +3,7 @@
 #
 # After first deployment, get device IDs with:
 #   syncthing cli show system | grep myID
-# Then update secrets/network.nix and redeploy.
+# Then update lib/network.nix and redeploy.
 
 { config, lib, net, ... }:
 
@@ -47,12 +47,6 @@ in
             type = "simple";
             params.keep = "5";
           };
-          ignorePerms = false;
-        };
-        "git-crypt-keys" = {
-          path = "/home/${net.user}/.config/git-crypt";
-          type = folderType;
-          devices = lib.attrNames otherHosts;
           ignorePerms = false;
         };
         # NOTE: the AI-lab Obsidian docs moved OFF Syncthing to an on-prem git
