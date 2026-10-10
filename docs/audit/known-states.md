@@ -39,7 +39,7 @@ Items that appear anomalous in system checks but are expected behavior. Check th
 ### Steam Split-Lock Warnings
 - **Symptom**: `x86/split lock detection: [...] steam` in journal
 - **Reason**: Valve bug — unaligned atomic operations in 32-bit client on Zen 4/5.
-- **Fix**: LD_PRELOAD shim (`steam-split-lock-fix.nix`) sets `prctl(PR_SET_BUS_LOCK_DETECT, WARN)` per-process. System-wide detection remains enforced.
+- **Fix**: LD_PRELOAD shim (`steam-split-lock-fix.nix`) sets `prctl(PR_SET_BUS_LOCK_DETECT, WARN)` per-process. System-wide: detection is **off on the workstation** (`split_lock_detect=off` kernel param) and enforced on the laptop.
 - **Note (2026-05-04)**: Steam observed relaunching with dark window during gameplay. May be related to split lock traps or a separate XWayland/CEF issue. Reopen investigation if it persists after fix.
 - **Cleanup (2026-05-04)**: Removed invalid env vars `STEAM_DISABLE_BROWSER_RESTART` and `STEAM_ENABLE_WAYLAND_BROWSER` (non-existent flags). Removed `STEAM_FORCE_DESKTOPUI_SCALING=1` (default value, no-op).
 
@@ -49,7 +49,7 @@ Items that appear anomalous in system checks but are expected behavior. Check th
 
 ### sudo PAM "conversation failed" in Non-TTY Context
 - **Symptom**: `pam_unix(sudo:auth): conversation failed` and `auth could not identify password for [<user>]`
-- **Reason**: Claude Code and deploy scripts invoke sudo without a TTY. Passwordless sudo matches specific commands but PAM still logs the auth attempt. Not a security risk.
+- **Reason**: Since 2026-10-09 sudo requires the password (60-min global cache). Outside the 60-min window any sudo except the `lab-*` wrappers fails without a TTY; PAM logs it. Expected.
 
 ### sops-nix /run/secrets Permission Denied
 - **Symptom**: `ls: cannot open directory '/run/secrets/': Permission denied`
@@ -70,6 +70,7 @@ Items that appear anomalous in system checks but are expected behavior. Check th
 ### DisplayLink xserver.videoDrivers on Wayland
 - **Symptom**: `services.xserver.videoDrivers` set despite Wayland-only session
 - **Reason**: DisplayLink DRM/KMS requires modesetting DDX. Needed even on Wayland.
+- *(superseded 2026-10-09: DisplayLink/EVDI is not active — `displaylink.nix` is kept but imported by no host; `videoDrivers` is the default `modesetting` + `fbdev`.)*
 
 ### Suspend/Hibernate Disabled
 - **Symptom**: System never suspends

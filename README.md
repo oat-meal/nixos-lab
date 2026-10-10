@@ -28,12 +28,12 @@ Host names (`workstation-nixos`, `laptop-nixos`, `server-nixos`) are examples �
 
 ## Storage Architecture
 
-All hosts use the same disk layout:
+All hosts share the same base layout:
 
 - **LUKS2** full-disk encryption with argon2id PBKDF
-- **ZFS** pools on LUKS containers (`rpool` for OS, `storage` for data where applicable)
+- **ZFS** pools on LUKS containers (`rpool` for OS; data on a separate `storage` pool on the workstation and on the `rpool/storage` dataset on the server)
 - **ZFS datasets**: `rpool/ROOT/nixos`, `rpool/home`, `rpool/nix`, `rpool/log`
-- **Swap**: ZFS zvol (`rpool/swap`) with hibernate support
+- **Swap**: ZFS zvol `rpool/swap` on the workstation (8G) and laptop (32G, hibernate); none on the server
 - **YubiKey FIDO2** unlock support (optional, enrolled post-install)
 
 ## Quick Start
@@ -114,9 +114,10 @@ nixos-lab/
 │   │   └── optional/                # Opt-in modules
 │   │       ├── ai/                  # Ollama, Open WebUI, ComfyUI, SearXNG, ChromaDB, dashboard
 │   │       ├── desktop/             # MangoWM, greetd, audio, fonts, apps
+│   │       ├── dev/                 # Game-dev tooling (gamedev.nix)
 │   │       ├── gaming/              # Steam, GameMode, Vulkan
 │   │       ├── hardware/            # AMD, Bluetooth, Framework, printing, DisplayLink (inactive)
-│   │       ├── monitoring/          # Post-rebuild verifier, AMD-stack smoke test, update advisor
+│   │       ├── monitoring/          # Post-rebuild verifier, GPU-wedge sentinel, update advisor, AMD-stack smoke test (imported by no host)
 │   │       ├── networking/          # Firewall, NordVPN, SSH, WiFi, WireGuard, Syncthing, Tailscale, sops
 │   │       ├── power/               # Performance, portable, hibernate
 │   │       ├── security/            # LUKS/FIDO2, YubiKey, PAM U2F, sudo
@@ -137,7 +138,7 @@ nixos-lab/
 ├── ai-lab/                          # Self-hosted AI stack (see docs/ai-lab.md)
 │   ├── api/                         # Lab OpenAPI tool server (Open WebUI tools)
 │   ├── bench/                       # Reproducible model benchmark scripts
-│   ├── comfyui/                     # ComfyUI image (Containerfile, workflows)
+│   ├── comfyui/                     # ComfyUI image (Containerfile, Containerfile.gfx1201, patch-custom-nodes.sh; workflows untracked by policy)
 │   ├── eliteintel/                  # Elite Dangerous voice copilot package
 │   ├── lora-training/               # LoRA training toolkit
 │   ├── mcp/                         # Host-health MCP server
@@ -145,8 +146,8 @@ nixos-lab/
 │   ├── quorum/                      # Multi-model quorum CLI
 │   ├── rag/                         # RAG (ChromaDB + embeddings) CLI
 │   ├── research/                    # Deep-research CLI (SearXNG → synthesize)
-│   ├── sentinel/                    # Nightly fleet-health + backup-integrity sentinel
-│   ├── smoke-test/                  # AMD ROCm stack smoke test
+│   ├── sentinel/                    # Nightly fleet-health + backup-integrity sentinel; SearXNG search-sentinel
+│   ├── smoke-test/                  # AMD ROCm stack smoke test (module kept, imported by no host)
 │   └── update-advisor/              # Weekly flake-update risk advisor
 │
 └── docs/
@@ -155,6 +156,8 @@ nixos-lab/
     ├── deployment.md                # Deployment guide
     ├── deployment-issues.md         # Deployment lessons learned
     ├── portal-filechooser.md        # xdg-desktop-portal FileChooser fix
+    ├── kernel-module-autoload.md    # systemd-initrd switch_root module-load bug
+    ├── searxng-engines-degraded.md  # SearXNG web engines disabled; API engines only
     ├── audit/                       # System audit framework
     └── NORDVPN-SETUP.md             # VPN guide
 ```
@@ -253,7 +256,8 @@ server's iGPU — faster than the 7B dense models while carrying 30B-class knowl
 and FLUX.1-schnell generates a 1024×1024 image in **~6.7 s** warm on the workstation.
 
 The lab also **self-monitors**: a nightly fleet-health + backup-integrity sentinel, a
-post-rebuild verifier, a daily AMD-stack smoke test, and a weekly flake-update advisor —
+post-rebuild verifier (server + laptop), a GPU-wedge sentinel (workstation), a SearXNG
+search-sentinel (server, 08:15/20:15), and a weekly flake-update advisor —
 all pushing to a private self-hosted ntfy hub (bridged into the desktops' notifications).
 Claude Code drives it through a read-only host-health MCP server (fleet health, backups,
 snapshots, flake status).
@@ -268,9 +272,9 @@ This lab is administered primarily through [Claude Code](https://claude.com/clau
 
 ### How it works
 
-- **CLAUDE.md** provides project context (repo structure, conventions, host access map, secrets workflow). Symlinked to `~/.claude/CLAUDE.md` on each host.
+- **CLAUDE.md** provides project context (repo structure, conventions, host access map, secrets workflow). Loaded when Claude Code runs in `/etc/nixos`; it is NOT symlinked to `~/.claude/CLAUDE.md` (that is the vault's Project-Map.md).
 - **Memory files** (`~/.claude/projects/`) persist knowledge across sessions — audit history, network topology, module patterns, known issues. Synced to all hosts via Syncthing so sessions can resume on any machine.
-- **Deployments**: Claude commits, pushes, then SSH's into each remote host to pull and rebuild. The interactive `deploy.sh` is for manual use; Claude drives each step directly since it can't interact with confirmation prompts.
+- **Deployments**: Claude commits and pushes. A switch needs oat's sudo password (60-min cache), so the person either opens that window or runs `deploy.sh` themselves; Claude can only deploy inside an open sudo window.
 - **Audits**: Claude runs the checklist from `docs/audit/README.md` across all hosts in parallel, filters journal errors against `docs/audit/known-states.md`, and records findings in per-host audit docs.
 
 ### What Claude does vs doesn't do
@@ -278,7 +282,8 @@ This lab is administered primarily through [Claude Code](https://claude.com/clau
 | Claude drives | User handles |
 |---|---|
 | Edit config, commit, push | Approve tool calls when prompted |
-| Deploy to all hosts via SSH | Physical access (YubiKey tap, cable check) |
+| Deploy to all hosts via SSH (only within a sudo window) | Type the sudo password / run `deploy.sh` |
+| | Physical access (YubiKey tap, cable check) |
 | Run audit checklists | Router/DHCP configuration |
 | Update docs and memory | Reboot hosts when needed |
 | Diagnose service issues | Confirm destructive operations |

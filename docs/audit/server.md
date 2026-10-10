@@ -14,7 +14,8 @@
   `cat /sys/class/net/enp191s0/speed`; `ethtool` was missing from this host until 2026-08-16
   and is now in core packages.
   WiFi (MediaTek MT7925, `mt7925e`) is **blacklisted**; see "Wired-only" below.
-- **Kernel**: `pkgs.linuxPackages_7_0` — pinned explicitly 2026-08-16. Do **not** use
+- **Kernel**: `pkgs.linuxPackages_6_18` (6.18 LTS; 6.18.44 on 2026-10-09). The 2026-08-16 pin was
+  `linuxPackages_7_0`, now EOL — ZFS follows only the LTS lines. Do **not** use
   `zfs.latestCompatibleLinuxPackages`: it is deprecated and now resolves to the nixpkgs
   *default* kernel, not the newest ZFS-compatible one, inverting the guarantee it was chosen
   for. It silently built 6.12.93 for a host running 7.0.10 — a major downgrade on next reboot,
@@ -33,8 +34,10 @@ profile that did not survive a reboot — NM fell back to an auto-generated DHCP
 mesh then only converged in whichever direction the server happened to initiate. The profile is
 now declared via `networking.networkmanager.ensureProfiles`.
 
-⚠️ **Open item (router-side):** `192.168.10.50` must sit outside the DHCP pool, or be reserved
-for `9c:bf:0d:01:03:73`. It is a static now, so a competing lease means an address conflict.
+~~**Open item (router-side):** `192.168.10.50` must sit outside the DHCP pool, or be reserved
+for `9c:bf:0d:01:03:73`.~~ **DONE 2026-08-16** (reserved at the router — see Pending validation #2).
+(2026-10-09: box found on DHCP .93 — NM auto-default profile won the race; fixed in config with
+`no-auto-default`, pending deploy.)
 
 ## Headless disk unlock (2026-08-16)
 
@@ -80,7 +83,9 @@ incompatible with unattended boot.
 - **Role**: Headless home server
 - **Remote access**: SSH and Mosh (wg0-only, key-only, no root)
 - **Sudo**: password (60 min global cache); NOPASSWD only for `lab-fw-dump`, `lab-listeners`, `lab-podman-probe` (2026-10-09; the udevadm rule had no consumer and was dropped)
-- **Services**: Ollama (ROCm GPU), Jellyfin, AdGuard Home, NFS server
+- **Services**: Ollama (ROCm GPU), Jellyfin, AdGuard Home, NFS server, plus the AI-lab stack (see docs/ai-lab.md)
+- **AdGuard Home**: as of 2026-10-09 its query log shows no queries since 2026-08-16 — LAN clients and the
+  server resolve via the router; it is not in the resolution path. Its admin API has no login (wg0-only).
 - **NFS**: Exports `/storage` to WireGuard subnet (root_squash)
 - **ZFS ARC**: 32GB
 - **ZFS maintenance**: Monthly scrub, auto-snapshots (frequent/hourly/daily/weekly/monthly)
@@ -93,16 +98,30 @@ incompatible with unattended boot.
 | SSH | 22 | TCP | wg0 only |
 | Mosh | 60000-60010 | UDP | wg0 only |
 | NFS | 111, 2049 | TCP/UDP | wg0 only |
-| AdGuard DNS | 53 | TCP/UDP | all |
+| AdGuard DNS | 53 | TCP/UDP | all (LAN) |
+| ntfy | 2586 | TCP | wg0 only |
 | AdGuard Home Web UI | 3000 | TCP | wg0 only |
-| Jellyfin | 8096 | TCP | all |
+| ChromaDB | 8000 | TCP | wg0 only |
+| Open WebUI | 8080 | TCP | wg0 only |
+| Lab dashboard | 8085 | TCP | wg0 only |
+| lab-api | 8091 | TCP | wg0 only |
+| Jellyfin | 8096 | TCP | wg0 only (from the 2026-10-09 deploy; was all — setup wizard never completed) |
+| ComfyUI | 8188 | TCP | wg0 only |
+| HY-Motion | 8190 | TCP | wg0 only |
+| Kokoro TTS | 8880 | TCP | wg0 only |
+| SearXNG | 8888 | TCP | wg0 only |
 | Ollama API | 11434 | TCP | wg0 only |
+| Syncthing | 22000 | TCP/UDP | all (LAN) |
+| Syncthing discovery | 21027 | UDP | all (LAN) |
+| WireGuard | 51821 | UDP | all (LAN) |
 
 ## Authorized SSH Keys
 
 - `<user>@workstation-nixos`
 - `<user>@laptop-nixos`
-- `<user>@server-nixos`
+
+The server's own `<user>` key is authorized nowhere; server-side probes reach other hosts as
+`lab-monitor`.
 
 ---
 

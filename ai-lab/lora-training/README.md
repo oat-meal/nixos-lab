@@ -56,7 +56,7 @@ Writes one `.txt` per image, then prepends `oatstyle,`.
 ```
 accelerate launch --num_processes 1 --mixed_precision bf16 /opt/sd-scripts/sdxl_train_network.py --config_file /config/config.toml --dataset_config /config/dataset.toml
 ```
-A few hours on the iGPU. Intermediate LoRAs save every 2 epochs to `/data/output`.
+A few hours on the iGPU. Intermediate LoRAs save every 400 steps (`save_every_n_steps = 400`, `max_train_epochs = 1`) to `/data/output`.
 **Avoid heavy ComfyUI/Ollama use during training** — they share the one GPU.
 
 ### Step 5 — use it
@@ -65,7 +65,7 @@ Copy the result into ComfyUI and load it in the `lora-text2img.json` workflow:
 cp /storage/lora-training/anime-style/output/oatstyle.safetensors /storage/comfyui/models/loras/
 ```
 In the workflow's **Load LoRA** node pick `oatstyle.safetensors`, and put **`oatstyle`** in
-your prompt to invoke the style. Compare the intermediate epochs (`oatstyle-000006` etc.)
+your prompt to invoke the style. Compare the intermediate checkpoints (`oatstyle-step00000400` etc.)
 to find the sweet spot (too weak = undertrained, too rigid = overtrained).
 
 ## Notes / iteration

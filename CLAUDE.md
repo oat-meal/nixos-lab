@@ -15,7 +15,7 @@ Run `hostname` at conversation start to determine context.
 - **Location**: `/etc/nixos/`
 - **Remote**: `git@github.com:oat-meal/nixos-lab.git` (SSH)
 - **Type**: Nix Flakes with Home Manager
-- **Channel**: nixpkgs-25.11 stable, selective unstable overlay (`pkgs.unstable.<pkg>`)
+- **Channel**: nixpkgs nixos-26.05 stable (home-manager release-26.05), selective unstable overlay (`pkgs.unstable.<pkg>`); claude-code from its own pinned `nixpkgs-claude` input
 - **Secrets**: sops-nix only (`secrets/secrets.yaml`); `hosts/network.nix` is plaintext by design (see Secrets section)
 - **CI**: GitHub Actions evaluates all three systems + the ISO and runs the content guard on every push
 
@@ -47,7 +47,7 @@ genuine infra file with `git commit --no-verify` (CI will still flag it).
 hosts/
 ├── common/
 │   ├── core/          # Required on ALL hosts (boot, locale, networking, nix, packages, shell, users)
-│   └── optional/      # Mix-in modules: ai/, desktop/, gaming/, hardware/, monitoring/,
+│   └── optional/      # Mix-in modules: ai/, desktop/, dev/, gaming/, hardware/, monitoring/,
 │                      #   networking/, power/, security/, storage/
 ├── workstation/       # Gaming workstation config
 ├── laptop/            # Framework 13 config
@@ -70,6 +70,7 @@ docs/
 ├── deployment-issues.md     # Past failures + fixes (incl. root-run git corruption)
 ├── kernel-module-autoload.md # systemd-initrd switch_root bug (hit laptop + server)
 ├── portal-filechooser.md    # xdg-desktop-portal: FileChooser + AppChooser/PATH failures
+├── searxng-engines-degraded.md # SearXNG web engines blocked/disabled; API engines only
 ├── ai-lab.md                # Models, benchmarks, serving stack, observability
 ├── nixos-primer.md          # Nix language / NixOS concepts
 ├── NORDVPN-SETUP.md         # wgnord setup guide (setup incomplete — see the doc)
@@ -213,10 +214,7 @@ NixOS firewall defaults to iptables backend (unless `networking.nftables.enable 
 - State technical specifications, not performance promises
 - Always provide single-line commands for copy/paste (no unnecessary line breaks)
 
-## Symlink Setup
+## Where this file is loaded
 
-This file lives in the repo and should be symlinked on each host:
-
-```bash
-ln -sf /etc/nixos/CLAUDE.md ~/.claude/CLAUDE.md
-```
+This file is project context, loaded when Claude Code runs in /etc/nixos. Do NOT symlink it to
+`~/.claude/CLAUDE.md` — that is the vault's Project-Map.md.

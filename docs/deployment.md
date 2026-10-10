@@ -51,8 +51,9 @@ others. Git runs as `<user>`; only `nixos-rebuild` uses sudo.
   later user-run git (see [deployment-issues.md](deployment-issues.md)).
 - **Prefer `all`** for changes that should be uniform, so hosts land on the
   same commit and generation together.
-- **Offline host during `all`:** it is skipped. Re-run
-  `deploy.sh <hostname>` once it is back on the mesh to converge it.
+- **Offline host during `all`:** the deploy aborts at that host (`set -euo pipefail`)
+  and later hosts are not attempted. Re-run `deploy.sh <hostname>` for each host
+  not yet converged.
 - **Reboot when needed:** `switch` applies most changes live, but kernel,
   initrd, and bootloader changes only take effect after a reboot.
 

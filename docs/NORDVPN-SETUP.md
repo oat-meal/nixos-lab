@@ -7,9 +7,11 @@
 >
 > **Unfinished work is parked, not lost.** A larger rewrite — a `wgnord` config template plus a
 > `nordvpn` `writeShellApplication` with profile management — was in progress on the laptop
-> (2026-08-11) and is **stashed** there as `stash@{0}` ("nordvpn WIP 2026-08-11 — unfinished,
-> non-working"). It was parked 2026-08-16 to keep builds clean and consistent. Recover with
-> `git stash pop` on laptop-nixos before starting fresh, or `git stash drop` to discard.
+> (2026-08-11) and is **stashed** there (message "nordvpn WIP 2026-08-11 — unfinished,
+> non-working (parked 2026-08-16)"; find it with `git stash list` — it is not `stash@{0}`).
+> It was parked 2026-08-16 to keep builds clean and consistent. Recover with
+> `git stash pop stash@{N}` on laptop-nixos before starting fresh, or `git stash drop stash@{N}`
+> to discard.
 >
 > Note `nordvpn.nix` is a **shared** module: changes land on two hosts. Test on one first
 > (postmortem action item #5).
@@ -67,24 +69,19 @@ sudo wg show
 nordvpn disconnect
 ```
 
-### List Available Servers
-
-```bash
-nordvpn list
-```
-
 ## Advanced Usage
 
 ### Direct wgnord Commands
 
-If you need more control:
+wgnord 0.2.1 has only `login`, `connect`, `disconnect` and `account` (no server listing, no
+`logout`, no `--technology` flag — it is always WireGuard/NordLynx):
 
 ```bash
-# Connect to specific server
-sudo wgnord connect us1234
+# Connect to a country
+sudo wgnord connect us
 
-# Use specific protocol
-sudo wgnord connect --technology nordlynx us
+# Show account info
+sudo wgnord account
 
 # Show help
 wgnord --help
@@ -116,7 +113,8 @@ If you want to prevent all internet traffic when VPN is disconnected, edit `/etc
 
 Steam Remote Play ports are already configured to work through the VPN. If you have connection issues:
 
-NixOS uses a declarative nftables firewall (not firewalld). If Steam Remote Play needs
+NixOS uses a declarative firewall (iptables backend here; `networking.nftables.enable = false`),
+not firewalld. If Steam Remote Play needs
 extra ports, add them to `networking.firewall.allowedTCPPorts` / `.allowedUDPPorts` and
 rebuild — there is no runtime `firewall-cmd`.
 
@@ -145,8 +143,7 @@ sudo resolvectl dns wgnord 103.86.96.100 103.86.99.100
 ### Can't authenticate
 
 ```bash
-# Re-login with token
-sudo wgnord logout
+# Re-login with token (there is no logout command; login overwrites the stored token)
 sudo wgnord login <YOUR_TOKEN>
 ```
 
@@ -174,7 +171,6 @@ sudo nft list ruleset | grep wgnord
 | `nordvpn connect us` | Connect to US server |
 | `nordvpn disconnect` | Disconnect from VPN |
 | `nordvpn status` | Show connection status |
-| `nordvpn list` | List available countries |
 | `sudo wg show` | Show WireGuard details |
 
 ## Next Steps

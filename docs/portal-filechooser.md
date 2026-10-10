@@ -37,7 +37,7 @@ Deploy, then **restart the user portal services** (a system rebuild doesn't rest
 services) or re-login:
 
 ```
-systemctl --user restart xdg-desktop-portal.service xdg-desktop-portal-gnome.service
+systemctl --user restart xdg-desktop-portal.service xdg-desktop-portal-gtk.service
 ```
 
 Electron apps (Obsidian, etc.) bind the portal at launch — **fully quit and relaunch** them.

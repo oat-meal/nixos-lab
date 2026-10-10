@@ -34,8 +34,9 @@ corruption recurred regularly.
   `nixos-rebuild` uses sudo. <user>'s default `~/.ssh/id_ed25519` provides
   GitHub auth, so the earlier `core.sshCommand` key override (added
   because root lacked the key) was removed.
-- `rebuild_remote` uses `ssh -n` so ssh does not consume the script's
-  stdin (the confirm prompts) when the loop iterates over multiple hosts.
+- `rebuild_remote` used `ssh -n` so ssh did not consume the script's
+  stdin (the confirm prompts) when the loop iterated over multiple hosts; since
+  2026-10-09 it uses `ssh -t` (sudo prompts for the password).
 
 ### One-time cleanup
 

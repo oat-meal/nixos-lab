@@ -101,10 +101,10 @@ traffic pattern rather than to any single request attribute.
 
 ## 5. The fix
 
-1. **Drop `bing`.** It is worse than no engine: a blocked engine is visibly
+1. **Drop `bing`.** ✅ DONE (disabled in `searxng.nix`). It is worse than no engine: a blocked engine is visibly
    blocked, this one is not, and nothing downstream can compensate for a source
    that fabricates plausibly.
-2. **Switch the default engine set to the APIs** — `crossref`, `openalex`,
+2. **Switch the default engine set to the APIs** ✅ DONE — `crossref`, `openalex`,
    `wikipedia`, `wikispecies` — which already work. This changes what the
    instance is good at (technical, scientific and reference questions rather
    than general web) and that is the honest trade, not a regression.
@@ -112,12 +112,13 @@ traffic pattern rather than to any single request attribute.
    Azure/Bing API, Tavily, Exa. SearXNG supports key-based engines. This is the
    only actual root-cause fix, because it stops the instance being a scraper.
    Everything else is cat-and-mouse with a party that has decided the answer.
-4. **Add a sentinel** in the `fleet-sentinel.nix` mould: query a fixed rare term
+4. **Add a sentinel** in the `fleet-sentinel.nix` mould ✅ DONE (`search-sentinel.nix`, 08:15/20:15): query a fixed rare term
    on a schedule and assert the term appears in the results. A liveness check on
    :8888 passes today and tells you nothing. This is the lab's own
    count-beside-a-verdict rule applied to a service whose verdict is currently
    "200 OK" over content nobody inspected.
-5. **Bump the package** to `pkgs.unstable.searxng` (`2026-07-26` vs the running
+5. ❌ **REJECTED 2026-08-31 — took the service down (HTTP 500 on every route); see
+   `hosts/common/optional/ai/searxng.nix`.** Original proposal: **bump the package** to `pkgs.unstable.searxng` (`2026-07-26` vs the running
    `2026-05-16`) — cheap and worth doing, following the existing
    `pkgs.unstable.*` pattern. ⚠️ **But do not expect it to fix bing**: the
    parsing code is byte-identical between the two.

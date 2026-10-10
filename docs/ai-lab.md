@@ -17,14 +17,15 @@ this hardware (measured, not estimated).
 | `laptop-nixos` | Framework 13, Ryzen | 32 GB | iGPU | Client |
 
 **On the Strix Halo memory model:** the iGPU shares system memory. The usable model
-ceiling is the ~62 GB GTT pool, *not* the nominal 128 GB — and `mem_info_vram_total`
+ceiling is the 80 GiB GTT pool (raised from the 62.5 GiB default via `amdgpu.gttsize=81920`), *not* the nominal 128 GB — and `mem_info_vram_total`
 reports only 512 MiB, which is misleading; GTT is the pool that matters. ZFS ARC is
 capped at 32 GB to leave headroom.
 
 ## Language models
 
-Served by Ollama 0.24.0 (`ollama-rocm`, native `gfx1151`), flash attention on,
-`num_ctx` 8192, 2 parallel slots.
+Served by Ollama (`pkgs.unstable.ollama-rocm`, native `gfx1151`; version from
+`nix eval --raw .#nixosConfigurations.server-nixos.pkgs.unstable.ollama-rocm.version` —
+0.32.5 on 2026-10-09), flash attention on, `OLLAMA_CONTEXT_LENGTH` 32768, 2 parallel slots.
 
 | Model | Params | Purpose / strengths |
 |-------|--------|---------------------|
@@ -34,6 +35,8 @@ Served by Ollama 0.24.0 (`ollama-rocm`, native `gfx1151`), flash attention on,
 | `qwen2.5-coder:32b` | 32B dense | Code generation and review; best-in-class open coding model. |
 | `llama3.3:70b` | 70B dense | Highest-capability general/reasoning model; slowest — use when quality beats latency. |
 | `qwen2.5vl:7b` | 7B VLM | Vision-language: image captioning, OCR, screenshot understanding, and critiquing generated images. Bridges the image-gen pipeline back into text. |
+| `deepseek-r1:8b` | 8B dense (qwen3-based distill) | Reasoning model with thinking output. Installed after the 2026-07-08 benchmarks — not benchmarked. |
+| `qwen3.5:9b` | 9.7B | Vision + tools + thinking. Installed after the 2026-07-08 benchmarks — not benchmarked. |
 
 ### Embeddings
 
@@ -158,11 +161,19 @@ local LLM only triages/summarizes; severities are assigned deterministically in 
   errors filtered against `docs/audit/known-states.md`) **plus backup integrity** (each
   auto-snapshot dataset must have recent snapshots). `qwen3` annotates each finding and
   writes the summary. → `/var/lib/fleet-sentinel/latest.md` + ntfy.
-- **post-rebuild verifier** (**server only** — see note) — an activation hook checks for
+- **post-rebuild verifier** (server + laptop) — an activation hook checks for
   failed units ~90 s after any rebuild → ntfy. Catches silent post-rebuild regressions.
-- **AMD-stack smoke test** (**not running** — see note) — a 1-token Ollama gen (`gfx1151`)
-  + a tiny ComfyUI gen (`gfx1201`); would alert if either ROCm path broke after an update.
+- **gpu-wedge sentinel** (workstation, every 5 min) — alerts when a kfd kworker is stuck in
+  D state *and* VRAM is >95% used across two samples, i.e. the amdgpu/KFD wedge.
+- **search-sentinel** (server, 08:15/20:15) — queries SearXNG for a rare term and asserts it
+  appears in the results (see `docs/searxng-engines-degraded.md`).
+- **AMD-stack smoke test** (**imported by no host** — module kept) — a 1-token Ollama gen
+  (`gfx1151`) + a tiny ComfyUI gen (`gfx1201`); would alert if either ROCm path broke.
 
+> *(superseded 2026-10-09: the post-rebuild verifier now runs on server + laptop, and the
+> workstation runs gpu-wedge-sentinel; neither the verifier nor the smoke test is imported on
+> the workstation. The note below is the 2026-08 history.)*
+>
 > ⚠️ **Coverage gap — the workstation is currently unmonitored.** Both of the above are
 > commented out of `hosts/workstation/default.nix`. They were disabled 2026-08-03 while
 > bisecting the WCN7850 WiFi outage (the smoke test's `Persistent` timer plus
@@ -177,8 +188,8 @@ local LLM only triages/summarizes; severities are assigned deterministically in 
 - **update advisor** (server, weekly) — previews `nix flake update` on a throwaway copy
   of the flake (never switches), then `qwen3` gives a per-input risk briefing.
 
-**Backups** — ZFS auto-snapshots on a dedicated `rpool/storage/git` dataset (the bare
-git repos), every 15 min + hourly/daily/weekly/monthly; the sentinel's backup check
+**Backups** — ZFS auto-snapshots on dedicated `rpool/storage/git` (the bare git repos)
+and `rpool/storage/reference` datasets, every 15 min + hourly/daily/weekly/monthly; the sentinel's backup check
 guards against them silently stopping. Models/media are excluded (re-downloadable).
 
 ## Claude Code MCP tools
@@ -207,9 +218,10 @@ All read-only. Separately, `lab_quorum` / `lab_rag_query` / `lab_research`
 
 The hard-won bits, since AMD APU/RDNA4 inference is still rough terrain:
 
-- **`gfx1151` (Strix Halo iGPU)** — needs the *unstable* `ollama-rocm` (0.24.0, native
-  `gfx1151`); stable Ollama crashes during compute even with `HSA_OVERRIDE_GFX_VERSION`.
-  All models above run **100% on the GPU**. The usable ceiling is the ~62 GB GTT pool.
+- **`gfx1151` (Strix Halo iGPU)** — needs the *unstable* `ollama-rocm` (native
+  `gfx1151`; version via the `nix eval` above); stable Ollama crashes during compute even with `HSA_OVERRIDE_GFX_VERSION`.
+  All models above run **100% on the GPU**. The usable ceiling is the 80 GiB GTT pool (raised
+  from the 62.5 GiB default via `amdgpu.gttsize=81920`).
 - **`gfx1201` (RX 9070 XT, RDNA 4)** — ComfyUI on ROCm 7.2 / PyTorch 2.12. HIP
   impersonates CUDA, so ComfyUI auto-enables two Nvidia-only optimizations (async
   weight offload + pinned host memory) that coredump on `gfx1201` during tiled SD

@@ -17,7 +17,7 @@ Read the host doc for hardware specs, known states, and audit history before mak
 - **Location**: `/etc/nixos/`
 - **Remote**: `git@github.com:oat-meal/nixos-lab.git` (SSH)
 - **Type**: Nix Flakes with Home Manager
-- **Channel**: nixpkgs-25.11 stable, selective unstable overlay (`pkgs.unstable.<pkg>`)
+- **Channel**: nixpkgs nixos-26.05 stable (home-manager release-26.05), selective unstable overlay (`pkgs.unstable.<pkg>`); claude-code from its own pinned `nixpkgs-claude` input
 
 ## Structure
 
@@ -25,7 +25,7 @@ Read the host doc for hardware specs, known states, and audit history before mak
 hosts/
 ├── common/
 │   ├── core/          # Required on ALL hosts (boot, locale, networking, nix, packages, shell, users)
-│   └── optional/      # Mix-in modules (ai/, desktop/, gaming/, hardware/, networking/, power/, security/, storage/)
+│   └── optional/      # Mix-in modules (ai/, desktop/, dev/, gaming/, hardware/, monitoring/, networking/, power/, security/, storage/)
 ├── workstation/       # Gaming workstation config
 ├── laptop/            # Framework 13 config
 ├── server/            # Home server
@@ -36,6 +36,11 @@ home/
 
 docs/
 ├── ai-lab.md          # Self-hosted AI stack: models, benchmarks, notes
+├── deployment.md      # Change→deploy cycle (deploy.sh, monthly flake update)
+├── deployment-issues.md # Past deploy failures + fixes
+├── kernel-module-autoload.md # systemd-initrd switch_root bug
+├── portal-filechooser.md # xdg-desktop-portal failures
+├── searxng-engines-degraded.md # SearXNG web engines disabled; API engines only
 ├── nixos-primer.md    # Intro to this flake for NixOS newcomers
 ├── audit/             # Per-host audit framework
 │   ├── README.md      # Audit checklist
@@ -56,7 +61,7 @@ sudo nixos-rebuild switch --flake /etc/nixos#$(hostname)
 sudo nixos-rebuild dry-activate --flake /etc/nixos#$(hostname)
 
 # Update inputs
-sudo nix flake update /etc/nixos
+nix flake update --flake /etc/nixos
 
 # Garbage collect
 sudo nix-collect-garbage --delete-older-than 30d
@@ -67,14 +72,17 @@ sudo nix-collect-garbage --delete-older-than 30d
 This repo is shared across machines. Before editing:
 
 ```bash
-cd /etc/nixos && sudo git pull --rebase
+git -C /etc/nixos pull --rebase
 ```
 
 After committing:
 
 ```bash
-cd /etc/nixos && sudo git push
+git -C /etc/nixos push
 ```
+
+Never run git as root (`sudo git`) — it leaves root-owned objects in `.git`
+(see `docs/deployment-issues.md`).
 
 On the other machine, pull before rebuilding.
 
@@ -101,10 +109,8 @@ Record audit results in the host's doc file (`docs/audit/<host>.md`).
 - State technical specifications, not performance promises
 - Repo docs are the source of truth; Obsidian links back to them
 
-## Symlink Setup
+## Where this file is loaded
 
-This file lives in the repo and should be symlinked on each host:
-
-```bash
-ln -sf /etc/nixos/CLAUDE.md ~/.claude/CLAUDE.md
-```
+The ISO links /etc/claude/CLAUDE.md into ~/.claude automatically. On installed hosts, the
+repo's own `/etc/nixos/CLAUDE.md` is project context, loaded when Claude Code runs in
+/etc/nixos. Do NOT symlink it to `~/.claude/CLAUDE.md` — that is the vault's Project-Map.md.

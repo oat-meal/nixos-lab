@@ -16,7 +16,7 @@
 - **WiFi**: Power saving enabled (battery optimization)
 - **Backlight**: `amdgpu.abmlevel=0` to prevent GPU idle lockups
 - **Fingerprint**: Reader support enabled
-- **Framework tools**: ectool
+- **Framework tools**: `framework_tool` (package `framework-tool`)
 - **SSH**: wg0-only, key-only, fail2ban (`openFirewall = false`, `ListenAddress = 10.100.0.3`)
 - **Sudo**: password (60 min global cache); NOPASSWD only for `lab-fw-dump`, `lab-listeners`, `lab-podman-probe` (2026-10-09)
 
@@ -24,7 +24,7 @@
 
 | Setting | Workstation | Laptop |
 |---------|-------------|--------|
-| Kernel | `linuxPackages_7_0` (pinned; 7.0.14) | `linux_6_12` LTS |
+| Kernel | `linuxPackages_6_18` (6.18 LTS) | `linux_6_12` LTS |
 | Suspend | Disabled | Enabled |
 | WiFi power save | Disabled | Enabled |
 | CPU governor | Performance | Managed by power-profiles-daemon |
@@ -39,7 +39,9 @@
 
 - `<user>@workstation-nixos`
 - `<user>@laptop-nixos`
-- `<user>@server-nixos`
+
+The server's `<user>` key is not authorized; server-side probes log in as `lab-monitor`
+(journal group only, `~/.ssh/lab_monitor` on the server).
 
 ---
 

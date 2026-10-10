@@ -100,10 +100,10 @@ ip link show | grep -E "^[0-9]"
 # DNS
 resolvectl status 2>/dev/null | head -15
 
-# Listening ports
-ss -tlnp 2>/dev/null
+# Listening ports (NOPASSWD wrapper; plain ss -tlnp hides other users' processes)
+sudo lab-listeners
 
-# WireGuard mesh
+# WireGuard mesh (needs the sudo password window)
 sudo wg show wg0
 
 # Syncthing status
@@ -219,8 +219,8 @@ ssh -o ConnectTimeout=5 <user>@10.100.0.3 "echo laptop OK"
 nc -z -w 3 <server-lan-ip> 22 && echo "server LAN SSH OPEN" || echo "server LAN SSH blocked"
 nc -z -w 3 <laptop-lan-ip> 22 && echo "laptop LAN SSH OPEN" || echo "laptop LAN SSH blocked"
 
-# Syncthing connected
-curl -s http://localhost:8384/rest/system/connections 2>/dev/null | grep -c '"connected":true'
+# Syncthing connected (the REST API returns 403 without an API key)
+syncthing cli show connections | grep -c '"connected": true'
 
 # NFS over WireGuard (from workstation)
 ls /mnt/server/ && echo "NFS OK" || echo "NFS FAIL"
@@ -231,6 +231,7 @@ ls /mnt/server/ && echo "NFS OK" || echo "NFS FAIL"
 #   result — GC roots pinning stale closures (see §10)
 # Note the local-host branch: a host cannot ssh to itself (host key verification
 # fails), so run the check directly there.
+# Run from workstation-nixos or laptop-nixos (the server's oat key is authorized nowhere).
 CHECK='printf "owner=%s dirty=%s result=%s\n" "$(find /etc/nixos -not -user "$(stat -c %U /etc/nixos)" | wc -l)" "$(git -C /etc/nixos status --porcelain | wc -l)" "$(ls /etc/nixos/result >/dev/null 2>&1 && echo PRESENT || echo none)"'
 for h in workstation-nixos laptop-nixos server-nixos; do
   printf "%-18s " "$h"

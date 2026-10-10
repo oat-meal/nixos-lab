@@ -7,10 +7,10 @@
 - **RAM**: 64GB DDR5
 - **Storage**: ZFS on LUKS2 (rpool: ROOT/nixos, home, nix, log, swap zvol) + storage pool (2x NVMe LUKS2)
 - **Network**: WiFi 7 (Qualcomm WCN785x, ath12k) + 5GbE Ethernet (RTL8126)
-- **Kernel**: `linuxPackages_7_0` — currently **7.0.14**. The 7.0.10 hold was lifted
-  2026-08-03 (`0bc7e1b`) once the WiFi failure was traced to boot ordering rather than the
-  kernel; the pin now exists only to avoid surprise MAJOR jumps, and 7.0.x patch bumps are
-  fine. See Known Issues.
+- **Kernel**: `pkgs.linuxPackages_6_18` (6.18 LTS; 6.18.44 on 2026-10-09). The 7.0 line is EOL
+  and ZFS follows only LTS lines. *(History: 7.0.x was pinned until the 26.05 migration; the
+  7.0.10 hold was lifted 2026-08-03 (`0bc7e1b`) once the WiFi failure was traced to boot
+  ordering rather than the kernel. See Known Issues.)*
 
 ## Host-Specific Configuration
 
@@ -20,7 +20,7 @@
 - **SSH**: wg0-only, key-only, fail2ban (`openFirewall = false`, `ListenAddress = 10.100.0.1`)
 - **Sudo**: password (60 min global cache); NOPASSWD only for `lab-fw-dump`, `lab-listeners`, `lab-podman-probe` (2026-10-09)
 - **NFS mount**: `/mnt/server` via WireGuard (10.100.0.2)
-- **DisplayLink**: EVDI module for USB displays
+- **DisplayLink**: not active — `displaylink.nix` (EVDI) is kept but imported by no host; `videoDrivers` is `modesetting` + `fbdev`
 - **nix-ld**: Enabled for Fightcade, AppImages
 - **Flatpak**: Enabled (Fightcade)
 
@@ -74,7 +74,8 @@
 | `/nix` | `rpool/nix` | rpool |
 | `/var/log` | `rpool/log` | rpool |
 | swap | `rpool/swap` (zvol) | rpool |
-| `/storage` | `storage` | storage (2x NVMe, LUKS2) |
+| `/storage` | `storage/data` | storage (2x NVMe, LUKS2) |
+| `/storage/comfyui` | `storage/comfyui` | storage |
 | `/storage/media` | `storage/media` | storage |
 | `/storage/steam` | `storage/steam` | storage |
 
@@ -86,13 +87,13 @@
 - ASUS ROG devices
 - Shure MV7+ (USB audio)
 - FiiO K7 (USB DAC)
-- Elgato Prompter (DisplayLink)
+- Elgato Prompter (DisplayLink — not functional: no host imports `displaylink.nix`)
 
 ## Troubleshooting
 
 ### Steam won't launch
 ```bash
-journalctl -u steam --no-pager
+journalctl --user -b --no-pager | grep -i steam
 rm -f ~/.steam/steam.pid
 steam
 ```

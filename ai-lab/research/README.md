@@ -20,4 +20,5 @@ Default synthesizer is `llama3.3:70b` (quality); use `qwen2.5:7b` for speed.
 ## Notes
 - Uses SearXNG result snippets (no page fetching) — fast and dependency-free. A future version
   could fetch + extract full pages for deeper synthesis.
-- SearXNG's Google engine is blocked (403); other engines supply results.
+- SearXNG serves API engines only (crossref, openalex, wikipedia, arxiv, pubmed …); general web
+  engines are disabled — see `docs/searxng-engines-degraded.md`.

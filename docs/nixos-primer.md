@@ -53,6 +53,7 @@ A **flake** is a self-contained Nix project with pinned dependencies. A `flake.n
 ```
 nixpkgs          → the package repository (like apt sources)
 nixpkgs-unstable → bleeding-edge packages (used selectively via overlay)
+nixpkgs-claude   → a separately pinned nixpkgs used only for claude-code
 home-manager     → manages user-level dotfiles and configs
 mango            → the MangoWM Wayland compositor
 noctalia         → the Noctalia desktop shell
@@ -78,17 +79,19 @@ When you run `nixos-rebuild switch --flake .#laptop-nixos`, Nix evaluates that o
 The `flake.nix` has a `mkSystem` helper that wires up each host:
 
 ```
-mkSystem { hostname, hostPath, enableDesktop, enableHomeManager }
+mkSystem { hostname, hostPath, extraModules, enableHomeManager }
          │
          ├── hostPath (e.g. hosts/laptop/default.nix)
          ├── sops-nix module (runtime secrets)
          ├── overlays (unstable packages, zen-browser)
-         ├── mango + noctalia modules (desktop hosts only)
-         └── home-manager (desktop hosts only)
+         ├── extraModules (default: none)
+         └── home-manager (when enableHomeManager, the default)
              └── home/oat/default.nix
 ```
 
-The server has `enableDesktop = false` and `enableHomeManager = false` — no GUI, no user-level config management.
+The desktop (MangoWM + Noctalia) comes from the host importing `optional/desktop/*` in its own
+`default.nix`, not from `mkSystem`. `enableDesktop` is still accepted but unused. The server
+sets `enableHomeManager = false` — no user-level config management.
 
 ## Module Layers
 
@@ -104,8 +107,9 @@ Configuration is organized in three layers:
 │   shell, users)                             │  shell, users
 ├─────────────────────────────────────────────┤
 │  hosts/common/optional/                     │  Mix-in modules: each host imports
-│  (desktop, gaming, hardware, networking,    │  only what it needs. Server skips
-│   power, security, storage)                 │  desktop and gaming entirely.
+│  (ai, desktop, dev, gaming, hardware,       │  only what it needs. Server skips
+│   monitoring, networking, power, security,  │  desktop and gaming entirely.
+│   storage)                                  │
 └─────────────────────────────────────────────┘
 ```
 
@@ -147,7 +151,7 @@ lib.mkForce "value"      # high priority — wins over everything
 lib.mkAfter [ ... ]      # append after other definitions (for ordered lists)
 ```
 
-This is how shared modules work: `sudo.nix` sets base rules at normal priority, and the server uses `lib.mkAfter` to add its own commands without replacing the base rules.
+This is how shared modules work. For example, `sudo.nix` sets the sudo policy once; hosts add only `lab.restartableUnits` (polkit), a list option whose definitions from each module are concatenated.
 
 ## Overlays
 

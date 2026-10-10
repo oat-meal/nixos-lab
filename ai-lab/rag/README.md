@@ -24,5 +24,4 @@ Env: `OLLAMA_HOST` (default `10.100.0.2:11434`), `CHROMA_HOST` (default `10.100.
 ## Notes
 - Chroma data persists in `/var/lib/chromadb` on the server (small; models keep the `/storage`
   dataset).
-- Next Phase 3: a model router + deep-research (SearXNG → fetch → synthesize), and optionally a
-  `lab-rag` Nix wrapper.
+- Wrapped as `lab-rag`; deep-research is in `ai-lab/research/`.

@@ -51,7 +51,7 @@ broken on its next boot.
 Import `hosts/common/optional/hardware/kernel-module-autoload.nix`. It does three things:
 
 1. `boot.kernel.sysctl."kernel.modprobe"` → the real kmod binary.
-2. `boot.kernelModules` force-loads `vfat`, `nls_cp437`, `nls_iso8859_1`, `af_packet` — these are
+2. `boot.kernelModules` force-loads `vfat`, `nls_cp437`, `nls_iso8859_1`, `af_packet`, `rfkill` (added 2026-08-21) — these are
    inserted by systemd-modules-load via libkmod, independent of the modprobe path.
 3. A `reapply-kernel-config` oneshot re-invokes both generators after `switch_root`, ordered
    `before` the consumers that were failing (`boot.mount`, `firewall.service`, `network-pre.target`,
