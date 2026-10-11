@@ -218,6 +218,7 @@
         security-policy = import ./tests/security-policy.nix { pkgs = nixpkgs.legacyPackages.${system}; };
         backup = import ./tests/backup.nix { pkgs = nixpkgs.legacyPackages.${system}; };
         heartbeat = import ./tests/heartbeat.nix { pkgs = nixpkgs.legacyPackages.${system}; };
+        media-disk = import ./tests/media-disk.nix { pkgs = nixpkgs.legacyPackages.${system}; };
       };
 
       ############################################################

@@ -323,6 +323,17 @@
     ];
   };
 
+  # The 20 TB media disk, on the server since 2026-10-10. Same fast-fail options as
+  # /mnt/server: an absent server or a locked disk errors in ~10s instead of hanging.
+  fileSystems."/mnt/media" = {
+    device = "${net.wireguard.meshIPs.server-nixos}:/srv/media";
+    fsType = "nfs";
+    options = [
+      "x-systemd.automount" "noauto" "_netdev" "x-systemd.idle-timeout=600"
+      "x-systemd.mount-timeout=10s" "retry=0" "timeo=50" "retrans=2"
+    ];
+  };
+
   ################################
   ## Flatpak support
   ################################

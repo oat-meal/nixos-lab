@@ -29,6 +29,7 @@
 
     # Storage
     ../common/optional/storage/zfs-maintenance.nix
+    ../common/optional/storage/media-disk.nix
     ../common/optional/monitoring/post-rebuild-verify.nix
     ../common/optional/monitoring/update-advisor.nix
 
@@ -321,6 +322,19 @@
   ];
 
   ################################
+  ## Media disk — 20 TB USB (WD Elements, serial SCH3EUDV), moved from the workstation
+  ################################
+  # Unlocked and imported after boot, never by it: a locked or unplugged disk cannot
+  # hold the boot (hosts/common/optional/storage/media-disk.nix, checks.media-disk).
+  # Media is expendable (oat, 2026-10-09), so snapshots keep 7 days, not 12 months:
+  # a deleted file frees its space within a week.
+  lab.mediaDisk = {
+    enable = true;
+    uuid = "c09c54c0-76b7-406e-a734-286268fa6ba6";
+    snapshot."media/library" = [ "frequent" "hourly" "daily" ];
+  };
+
+  ################################
   ## Jellyfin — media server
   ################################
   services.jellyfin = {
@@ -365,6 +379,7 @@
     enable = true;
     exports = ''
       /storage  ${net.wireguard.meshIPs.workstation-nixos}(rw,sync,no_subtree_check,root_squash,crossmnt)
+      /srv/media  ${net.wireguard.meshIPs.workstation-nixos}(rw,sync,no_subtree_check,root_squash) ${net.wireguard.meshIPs.laptop-nixos}(rw,sync,no_subtree_check,root_squash)
     '';
   };
 
