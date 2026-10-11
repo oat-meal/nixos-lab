@@ -187,9 +187,10 @@ local LLM only triages/summarizes; severities are assigned deterministically in 
 > itself down (action item #3 — closed 2026-10-10 by the heartbeat dead-man switch above).
 - **heartbeat dead-man switch** (server publishes, workstation watches, every 5 min) — the
   server POSTs to ntfy topic `lab-heartbeat`; the workstation asks ntfy for one newer than
-  15 min and, on a change of state (`ok` / `missing` / `unreachable`), raises a desktop
+  15 min and, on a change of state (`ok` / `missing` / `unreachable`; a bad state must hold
+  for two consecutive runs, recovery is immediate), raises a desktop
   notification **on its own session bus, not through the server**. Closes postmortem action
-  item #3: a down server can now be reported. Proven by `checks.heartbeat` (5/5).
+  item #3: a down server can now be reported. Proven by `checks.heartbeat` (6/6).
 - **update advisor** (server, weekly) — previews `nix flake update` on a throwaway copy
   of the flake (never switches), then `qwen3` gives a per-input risk briefing.
 

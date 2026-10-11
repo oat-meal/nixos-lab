@@ -4,7 +4,8 @@
 #
 # `server` runs ntfy and the publisher; `watcher` runs the watch unit as the real user with
 # an alert command that records each call. Walks ok -> missing -> ok -> unreachable and
-# requires exactly one alert per transition and none while a state persists. The publisher
+# requires exactly one alert per transition, none while a state persists, and none for a
+# single bad run (a bad state alerts only when two consecutive runs agree). The publisher
 # and watcher run as their real sandboxed units, and must end Result=success.
 { pkgs }:
 
@@ -46,6 +47,8 @@ pkgs.testers.runNixOSTest {
         maxAge = "1m";          # short so the test can age a heartbeat out
         alertCommand = "${record}";
       };
+      # The test starts the watcher several times a second; the 5-minute timer never does.
+      systemd.services.lab-heartbeat-watch.unitConfig.StartLimitIntervalSec = 0;
     };
   };
 
@@ -64,7 +67,7 @@ pkgs.testers.runNixOSTest {
             print(m.succeed(f"journalctl -u {unit} --no-pager -o cat | tail -20"))
         assert res == "success", f"{unit} ended with Result={res}"
     def state():
-        return W.succeed("cat /var/lib/lab-heartbeat-watch/state 2>/dev/null || echo none").strip()
+        return W.succeed("cat /var/lib/lab-heartbeat-watch/state 2>/dev/null || echo ok").strip()
     def alerts():
         return W.succeed("cat /var/lib/lab-heartbeat-watch/alerts 2>/dev/null || true").split()
 
@@ -86,13 +89,30 @@ pkgs.testers.runNixOSTest {
     assert alerts() == [], alerts()
     ok("watch: runs as ${net.user}; fresh heartbeat -> no alert")
 
-    # Age the heartbeat out (maxAge 1m). ntfy answers, nothing new -> missing, one alert.
+    def last_log():
+        inv = W.succeed("systemctl show -p InvocationID --value lab-heartbeat-watch.service").strip()
+        return W.succeed(f"journalctl --no-pager -o cat _SYSTEMD_INVOCATION_ID={inv}")
+
+    # Blip: one bad run, then good again -> no alert at all. The 2026-10-10 false alarm.
     time.sleep(70)
+    run(W, "lab-heartbeat-watch.service")
+    log = last_log()
+    assert "unconfirmed" in log and "ntfy: http=200" in log, log
+    assert state() == "ok" and alerts() == [], (state(), alerts())
+    run(S, "lab-heartbeat.service")
+    run(W, "lab-heartbeat-watch.service")
+    assert state() == "ok" and alerts() == [], (state(), alerts())
+    ok("blip: a single missing run is logged with ntfy's answer and does not alert")
+
+    # Age the heartbeat out (maxAge 1m). Two runs agree on missing -> one alert.
+    time.sleep(70)
+    run(W, "lab-heartbeat-watch.service")
+    assert alerts() == [], alerts()
     run(W, "lab-heartbeat-watch.service")
     assert state() == "missing" and alerts() == ["missing"], (state(), alerts())
     run(W, "lab-heartbeat-watch.service")
     assert alerts() == ["missing"], alerts()
-    ok("missing: one alert on the transition, none while it persists")
+    ok("missing: alerts once two runs agree, none while it persists")
 
     # Publisher back -> ok, recovery alert.
     run(S, "lab-heartbeat.service")
@@ -103,10 +123,13 @@ pkgs.testers.runNixOSTest {
     # Server's ntfy gone -> unreachable. Control: it answered a moment ago (above).
     S.succeed("systemctl stop ntfy-sh.service")
     run(W, "lab-heartbeat-watch.service")
+    log = last_log()
+    assert "ntfy: http=000 bytes=0" in log and alerts() == ["missing", "ok"], (log, alerts())
+    run(W, "lab-heartbeat-watch.service")
     assert state() == "unreachable" and alerts() == ["missing", "ok", "unreachable"], (state(), alerts())
-    ok("unreachable: ntfy down -> one alert, delivered without the server")
+    ok("unreachable: ntfy down -> one alert after two runs, delivered without the server")
 
-    print(f"HEARTBEAT: {checks}/5 checks passed")
-    assert checks == 5, checks
+    print(f"HEARTBEAT: {checks}/6 checks passed")
+    assert checks == 6, checks
   '';
 }

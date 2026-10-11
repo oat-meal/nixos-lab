@@ -11,12 +11,14 @@
 #     unreachable — ntfy did not answer (server down, wg0 down, ntfy down)
 #   On a CHANGE of state it alerts locally — a desktop notification on the watcher's own
 #   session bus — and never through the server. One alert per transition, plus recovery.
+#   A bad state alerts only once two consecutive runs agree (worst case ~maxAge + 10 min);
+#   recovery alerts on the first good run.
 #
 # The watcher checks the consumer path: the same ntfy URL the desktop bridge subscribes
 # to, and a message the server actually sent, rather than pinging an address.
 #
 # Proven by checks.heartbeat (tests/heartbeat.nix): ok -> missing -> ok -> unreachable,
-# one alert per transition, none while a state persists.
+# one alert per transition, none while a state persists, none for a single-run blip.
 
 { config, lib, pkgs, net, ... }:
 
@@ -87,12 +89,25 @@ in
         path = [ pkgs.curl pkgs.coreutils pkgs.gnugrep ];
         script = ''
           dir=$STATE_DIRECTORY
-          if body=$(curl -fsS -m 15 ${lib.escapeShellArg cfg.url}"/json?poll=1&since=${cfg.watch.maxAge}"); then
-            if printf '%s' "$body" | grep -q '"event":"message"'; then now=ok; else now=missing; fi
-          else
-            now=unreachable
-          fi
+          rm -f "$dir/last-body"
+          code=$(curl -sS -m 15 -o "$dir/last-body" -w '%{http_code}' \
+            ${lib.escapeShellArg cfg.url}"/json?poll=1&since=${cfg.watch.maxAge}") || code=000
+          case "$code" in
+            2??) if grep -q '"event":"message"' "$dir/last-body"; then now=ok; else now=missing; fi ;;
+            *)   now=unreachable ;;
+          esac
+          # What ntfy actually answered, so a surprising state can be explained afterwards.
+          echo "ntfy: http=$code bytes=$(wc -c < "$dir/last-body" 2>/dev/null || echo 0)"
+          # A bad state must be seen on two runs in a row before it alerts. One false
+          # `missing` was seen 1s into the watcher's own deploy (2026-10-10) and cleared on
+          # the next run; this costs one interval of latency. Recovery to ok is immediate.
+          seen=$(cat "$dir/last-seen" 2>/dev/null || echo ok)
+          echo "$now" > "$dir/last-seen"
           prev=$(cat "$dir/state" 2>/dev/null || echo ok)
+          if [ "$now" != ok ] && [ "$now" != "$seen" ] && [ "$now" != "$prev" ]; then
+            echo "heartbeat: $now (unconfirmed, was $prev; alerts if the next run agrees)"
+            exit 0
+          fi
           echo "heartbeat: $now (was $prev)"
           [ "$now" = "$prev" ] && exit 0
           echo "$now" > "$dir/state"
