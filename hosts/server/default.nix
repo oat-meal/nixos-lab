@@ -48,6 +48,7 @@
     ../common/optional/ai/hy-motion.nix          # text-to-motion; CPU-only, no vendor exists for this
     ../common/optional/ai/ntfy.nix
     ../common/optional/monitoring/heartbeat.nix   # publishes; the workstation watches
+    ../common/optional/monitoring/netconsole.nix  # receives the workstation's kernel log
   ];
 
   ################################
@@ -55,6 +56,7 @@
   ################################
   networking.hostName = "server-nixos";
   lab.heartbeat.publish.enable = true;   # watched from the workstation (monitoring/heartbeat.nix)
+  lab.netconsole.receive = { enable = true; interface = "enp191s0"; };   # journalctl -t netconsole
   system.stateVersion = "25.11";
   networking.hostId = "dc598b84";
 

@@ -85,11 +85,16 @@
 
     # Watches the server's heartbeat (lab.heartbeat.watch below).
     ../common/optional/monitoring/heartbeat.nix
+
+    # Kernel messages to the server over UDP, so a userspace stall that stops the
+    # journal still leaves a record (2026-10-13 freeze; lab.netconsole.send below).
+    ../common/optional/monitoring/netconsole.nix
   ];
 
   # Off-host dead-man switch: alerts on THIS desktop when the server stops publishing,
   # without going through the server (postmortem action item #3, closed by this).
   lab.heartbeat.watch.enable = true;
+  lab.netconsole.send = { enable = true; interface = "enp17s0"; };
 
   ################################
   ## Host identity
