@@ -51,6 +51,15 @@
     # stay separate so either can move without the other.
     nixpkgs-claude.url = "github:NixOS/nixpkgs/e7439b6b14ad3cc35d05608ebca9bce01a25f5f8";
 
+    # ChatGPT desktop app — a FOURTH nixpkgs, pinned, feeding exactly one
+    # package, for the same reasons as nixpkgs-claude above. Added 2026-10-20:
+    # `chatgpt` in nixpkgs-unstable's lock (2026-10-08) is aarch64-darwin ONLY;
+    # Linux support (a repackaged official .deb) landed after it. Bumping
+    # nixpkgs-unstable for it would move mango, ollama-rocm and the rest. Like
+    # claude-code it is prebuilt and compiles nothing. Channel revision, so the
+    # closure comes from the cache. Bump THIS input alone to move ChatGPT.
+    nixpkgs-chatgpt.url = "github:NixOS/nixpkgs/09063bd1f2b36fd9fd793c36dfade7bd40a93dfc";
+
     # Home Manager
     home-manager = {
       url = "github:nix-community/home-manager/release-26.05";
@@ -98,7 +107,7 @@
   ################################
   ## FLAKE OUTPUTS
   ################################
-  outputs = { self, nixpkgs, nixpkgs-unstable, nixpkgs-claude, home-manager, zen-browser, sops-nix, noctalia, mango, ... }:
+  outputs = { self, nixpkgs, nixpkgs-unstable, nixpkgs-claude, nixpkgs-chatgpt, home-manager, zen-browser, sops-nix, noctalia, mango, ... }:
     let
       system = "x86_64-linux";
 
@@ -155,7 +164,15 @@
           }).claude-code.override {
             alsa-lib = prev.alsa-lib;
           };
+          # See the nixpkgs-chatgpt comment under inputs.
+          chatgpt = (import nixpkgs-chatgpt {
+            inherit system;
+            config = prev.config;
+          }).chatgpt;
         };
+        # Not in nixpkgs at all; built against STABLE, so it shares this
+        # host's glibc and libraries. Provenance in the package file.
+        claude-desktop = prev.callPackage ./pkgs/claude-desktop/package.nix { };
       };
 
       # Lab addresses, public keys, Syncthing IDs — passed to every module as `net`.

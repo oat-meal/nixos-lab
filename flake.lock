@@ -99,6 +99,22 @@
         "type": "github"
       }
     },
+    "nixpkgs-chatgpt": {
+      "locked": {
+        "lastModified": 1792210252,
+        "narHash": "sha256-Mh0PUaIv4nFY+8wAGonaEh8iBzwsmdNlwjVHmFg1Biw=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "09063bd1f2b36fd9fd793c36dfade7bd40a93dfc",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "09063bd1f2b36fd9fd793c36dfade7bd40a93dfc",
+        "type": "github"
+      }
+    },
     "nixpkgs-claude": {
       "locked": {
         "lastModified": 1791456040,
@@ -171,6 +187,7 @@
         "home-manager": "home-manager",
         "mango": "mango",
         "nixpkgs": "nixpkgs",
+        "nixpkgs-chatgpt": "nixpkgs-chatgpt",
         "nixpkgs-claude": "nixpkgs-claude",
         "nixpkgs-unstable": "nixpkgs-unstable",
         "noctalia": "noctalia",

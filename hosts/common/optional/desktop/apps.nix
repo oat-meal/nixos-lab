@@ -61,11 +61,26 @@
     pkgs.unstable.claude-code
     p7zip
 
+    # AI desktop apps (official Linux builds; see flake.nix and pkgs/)
+    claude-desktop
+    pkgs.unstable.chatgpt
+
     # Browsers
     zen-browser
 
     # Notes
     obsidian
+  ];
+
+  # Claude Desktop's Cowork VM looks for UEFI firmware ONLY at these fixed
+  # paths, and the app's asar-integrity fuse forbids patching them out (see
+  # pkgs/claude-desktop/package.nix). Without this, Cowork cannot boot its VM.
+  # virtiofsd likewise: the copy bundled with the app is used ONLY on Ubuntu
+  # 22.x; everywhere else it must be at /usr/libexec or /usr/bin. Measured
+  # 2026-10-20: with OVMF alone, Cowork still reported "unsupported".
+  systemd.tmpfiles.rules = [
+    "L+ /usr/share/OVMF - - - - ${pkgs.OVMF.fd}/FV"
+    "L+ /usr/libexec/virtiofsd - - - - ${pkgs.virtiofsd}/bin/virtiofsd"
   ];
 
   # Wayland environment
